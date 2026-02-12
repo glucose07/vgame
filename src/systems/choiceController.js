@@ -34,11 +34,9 @@ export function setupChoiceInteraction(k, opts) {
     // Detect touch-capable device for prompt text
     const isTouchDevice = ("ontouchstart" in globalThis) || (navigator.maxTouchPoints > 0);
     const promptText = isTouchDevice ? "Tap" : "(E) Interact";
-    // Font boost: compensate for low Kaplay scale on narrow/mobile screens
-    const fontBoost = Math.max(1, 600 / window.innerWidth);
 
     const prompt = k.add([
-        k.text(promptText, { size: Math.round(16 * fontBoost), font: "Nunito" }),
+        k.text(promptText, { size: 16, font: "Nunito" }),
         k.pos(0, 0),
         k.anchor("center"),
         k.color(255, 255, 255),

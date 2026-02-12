@@ -47,10 +47,8 @@ export function setupUI(k, opts) {
     const { clearingCenter, clearingRadius, npcCenter, player, choiceLabels, worldW, worldH, successBus } = opts;
 
     // ---- Responsive sizing ----
-    // Font boost: compensate for low Kaplay scale on narrow/mobile screens
-    const fontBoost = Math.max(1, 600 / window.innerWidth);
-    const fontSize = Math.round(Math.max(10, Math.min(worldW * 0.024, 16)) * fontBoost);
-    const nameSize = Math.round(Math.max(9, Math.min(worldW * 0.018, 13)) * fontBoost);
+    const fontSize = Math.round(Math.max(10, Math.min(worldW * 0.024, 16)));
+    const nameSize = Math.round(Math.max(9, Math.min(worldW * 0.018, 13)));
 
     // ---- Speech bubble dimensions (tight fit around text) ----
     const bubblePadX = 6;

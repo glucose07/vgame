@@ -18,6 +18,7 @@ export default defineConfig({
     base: "./",
     server: {
         port: 3001,
+        host: true,  // expose to local network so you can test on your phone
     },
     build: {
         // disable this for low bundle sizes
