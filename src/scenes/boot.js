@@ -17,6 +17,13 @@ export default function bootScene(k) {
         ["unnamed_tile", "assets/tiles/unnamed_tile.png"],
         ["path_tile", "assets/tiles/path_tile.png"],
         ["player_sheet", "assets/characters/player_sheet.png", { sliceX: 3, sliceY: 4 }],
+        ["npc_sheet", "assets/characters/npc_sheet.png", {
+            sliceX: 8,
+            sliceY: 14,
+            anims: {
+                "idle-left": { from: 8, to: 9, speed: 2, loop: true },
+            },
+        }],
     ];
     const loadPromises = optionalAssets.map(([name, path, opt]) =>
         Promise.resolve(k.loadSprite(name, path, opt || {})).catch(() => {})

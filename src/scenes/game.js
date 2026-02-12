@@ -114,24 +114,29 @@ export default function gameScene(k) {
     ]);
 
     // ---- M4: NPC placeholder — to the right of clearing center, speech bubble above ----
-    const npcSize = 32;
+    const npcSize = 192;
     const npcX = clearingCenterX + 60;
     const npcY = clearingCenterY - npcSize / 2;
+    const hasNpcSprite = !!k.getSprite("npc_sheet");
     const npc = k.add([
-        k.rect(npcSize, npcSize),
+        hasNpcSprite ? k.sprite("npc_sheet", { frame: 8 }) : k.rect(npcSize, npcSize),
         k.pos(npcX, npcY),
-        k.anchor("topleft"),
-        k.color(100, 90, 140),
+        ...(hasNpcSprite
+            ? [k.scale(-3, 3), k.anchor("topright")]
+            : [k.anchor("topleft"), k.color(100, 90, 140)]),
     ]);
+    if (hasNpcSprite) {
+        npc.play("idle-left");
+    }
 
     // ---- M2: Player — sprite if loaded, else rect; onKeyDown move; spawn at path start ----
     // const hasPlayerSprite = k.getSprite("player_sheet");
     const hasPlayerSprite = false;
     const player = k.add([
-        hasPlayerSprite ? k.sprite("player_sheet") : k.rect(32, 32),
-        k.pos(40, h / 2 - 16),
+        hasPlayerSprite ? k.sprite("player_sheet") : k.rect(64, 64),
+        k.pos(40, h / 2 - 32),
         k.area(),
-        ...(hasPlayerSprite ? [] : [k.color(200, 80, 80)]),
+        ...(hasPlayerSprite ? [k.scale(2)] : [k.color(200, 80, 80)]),
         "player",
     ]);
 
@@ -166,8 +171,8 @@ export default function gameScene(k) {
     k.onKeyDown("s",     () => { clearMoveTarget(); player.move(0, moveAmount); });
 
     // Clamp to world bounds + click-to-move towards target
-    const playerW = 32;
-    const playerH = 32;
+    const playerW = 64;
+    const playerH = 64;
     const arrivalThreshold = 8;  // stop moving when this close to target
     k.onUpdate(() => {
         // Move toward click/touch target
