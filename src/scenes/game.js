@@ -269,7 +269,7 @@ export default function gameScene(k) {
                 k.anchor("center"),
                 k.scale(2.0 + Math.random() * 1.4),
                 k.opacity(0.9),
-                k.z(10),
+                k.z(20),
             ]);
 
             flowerEntries.push({
@@ -674,6 +674,7 @@ export default function gameScene(k) {
         k.pos(40, h / 2 - playerH / 2),
         k.scale(playerScale),
         k.area(),
+        k.z(60),
         ...(hasPlayerSprite ? [] : [k.color(200, 80, 80)]),
         "player",
     ]);
@@ -723,17 +724,11 @@ export default function gameScene(k) {
     const roseCollisionBodyW = playerBodyW;
     const roseCollisionBodyH = playerBodyH;
     const arrivalThreshold = 8;  // stop moving when this close to target
+    let moveBlockTimer = 0;
     k.onUpdate(() => {
-        // ---- Animation switching ----
-        if (hasPlayerSprite) {
-            const isMoving = playerMoving || !!moveTarget;
-            const animName = isMoving ? `walk-${playerDir}` : `idle-${playerDir}`;
-            player.flipX = (playerDir === "left");
-            if (player.curAnim() !== animName) {
-                player.play(animName);
-            }
-            playerMoving = false;
-        }
+        const startX = player.pos.x;
+        const startY = player.pos.y;
+        let collidedThisFrame = false;
 
         // Move toward click/touch target
         if (moveTarget) {
@@ -746,6 +741,7 @@ export default function gameScene(k) {
                 moveTarget = null;
             } else {
                 player.move((dx / dist) * moveAmount, (dy / dist) * moveAmount);
+                playerMoving = true;
                 // Infer direction from movement vector for touch-to-move
                 if (Math.abs(dx) > Math.abs(dy)) {
                     playerDir = dx > 0 ? "right" : "left";
@@ -781,6 +777,7 @@ export default function gameScene(k) {
             let dy = closestY - rose.pos.y;
             let dist = Math.hypot(dx, dy);
             if (dist < roseCollisionRadius) {
+                collidedThisFrame = true;
                 if (dist < 0.0001) {
                     // Fallback: rose center is within player body box.
                     dx = (player.pos.x + roseCollisionOffsetX) - rose.pos.x;
@@ -814,6 +811,7 @@ export default function gameScene(k) {
         const overlapX = Math.min(pRight, npcRight) - Math.max(pLeft, npcLeft);
         const overlapY = Math.min(pBottom, npcBottom) - Math.max(pTop, npcTop);
         if (overlapX > 0 && overlapY > 0) {
+            collidedThisFrame = true;
             // Push along the axis with the smallest overlap
             if (overlapX < overlapY) {
                 player.pos.x += (pLeft < npcLeft) ? -overlapX : overlapX;
@@ -821,6 +819,33 @@ export default function gameScene(k) {
                 player.pos.y += (pTop < npcTop) ? -overlapY : overlapY;
             }
         }
+
+        const movedDist = Math.hypot(player.pos.x - startX, player.pos.y - startY);
+        const movedThisFrame = movedDist > 0.05;
+        if (moveTarget) {
+            if (movedThisFrame) {
+                moveBlockTimer = 0;
+            } else {
+                moveBlockTimer += k.dt();
+            }
+            if (collidedThisFrame || moveBlockTimer > 0.12) {
+                moveTarget = null;
+                moveBlockTimer = 0;
+            }
+        } else {
+            moveBlockTimer = 0;
+        }
+
+        // Drive walk/idle by input intent, but stop walking when colliding with solid borders.
+        if (hasPlayerSprite) {
+            const shouldWalk = playerMoving && !collidedThisFrame;
+            const animName = shouldWalk ? `walk-${playerDir}` : `idle-${playerDir}`;
+            player.flipX = (playerDir === "left");
+            if (player.curAnim() !== animName) {
+                player.play(animName);
+            }
+        }
+        playerMoving = false;
     });
 
     // ---- M4: Proximity prompt + one-time interact (choiceController) ----

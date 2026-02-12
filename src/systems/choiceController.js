@@ -36,11 +36,24 @@ export function setupChoiceInteraction(k, opts) {
     let lastInRange = false;
     let pulseTime = 0;
     let promptFade = 0;
+    const setUniformScale = (entity, value) => {
+        if (!entity || !entity.scale) {
+            if (entity) entity.scale = k.vec2(value, value);
+            return;
+        }
+        if (typeof entity.scale === "number") {
+            entity.scale = k.vec2(value, value);
+            return;
+        }
+        entity.scale.x = value;
+        entity.scale.y = value;
+    };
 
     // Detect touch-capable device for tap support.
     const isTouchDevice = ("ontouchstart" in globalThis) || (navigator.maxTouchPoints > 0);
-    // E-key prompt body.
-    const promptKeyShadow = k.add([
+    const hasTapIconSprite = !!k.getSprite("finger_icon");
+    // Desktop key prompt body.
+    const promptKeyShadow = !isTouchDevice ? k.add([
         k.rect(20, 20, { radius: 5 }),
         k.pos(0, 0),
         k.anchor("center"),
@@ -48,8 +61,8 @@ export function setupChoiceInteraction(k, opts) {
         k.opacity(0),
         k.z(225),
         "choicePrompt",
-    ]);
-    const promptKeyBody = k.add([
+    ]) : null;
+    const promptKeyBody = !isTouchDevice ? k.add([
         k.rect(18, 18, { radius: 4 }),
         k.pos(0, 0),
         k.anchor("center"),
@@ -57,8 +70,8 @@ export function setupChoiceInteraction(k, opts) {
         k.opacity(0),
         k.z(226),
         "choicePrompt",
-    ]);
-    const promptKeyLabel = k.add([
+    ]) : null;
+    const promptKeyLabel = !isTouchDevice ? k.add([
         k.text("E", { size: 12, font: "Nunito" }),
         k.pos(0, 0),
         k.anchor("center"),
@@ -66,9 +79,53 @@ export function setupChoiceInteraction(k, opts) {
         k.opacity(0),
         k.z(227),
         "choicePrompt",
-    ]);
+    ]) : null;
+    const promptTapHintShadow = isTouchDevice ? k.add([
+        k.rect(34, 34, { radius: 8 }),
+        k.pos(0, 0),
+        k.anchor("center"),
+        k.color(40, 30, 30),
+        k.opacity(0),
+        k.z(228),
+        "choicePrompt",
+    ]) : null;
+    const promptTapHintBody = isTouchDevice ? k.add([
+        k.rect(30, 30, { radius: 8 }),
+        k.pos(0, 0),
+        k.anchor("center"),
+        k.color(255, 255, 255),
+        k.opacity(0),
+        k.z(229),
+        "choicePrompt",
+    ]) : null;
+    const promptTapHintIcon = isTouchDevice ? k.add([
+        hasTapIconSprite ? k.sprite("finger_icon") : k.circle(3.8),
+        k.pos(0, 0),
+        k.anchor("center"),
+        ...(hasTapIconSprite ? [k.scale(1.56)] : [k.color(82, 58, 68), k.scale(1)]),
+        k.opacity(0),
+        k.z(230),
+        "choicePrompt",
+    ]) : null;
+    const promptTapHintRing = isTouchDevice ? k.add([
+        k.circle(6.2),
+        k.pos(0, 0),
+        k.anchor("center"),
+        k.color(242, 120, 145),
+        k.scale(1),
+        k.opacity(0),
+        k.z(231),
+        "choicePrompt",
+    ]) : null;
 
-    const promptParts = [promptKeyShadow, promptKeyBody, promptKeyLabel];
+    const promptParts = [];
+    if (promptKeyShadow) promptParts.push(promptKeyShadow);
+    if (promptKeyBody) promptParts.push(promptKeyBody);
+    if (promptKeyLabel) promptParts.push(promptKeyLabel);
+    if (promptTapHintShadow) promptParts.push(promptTapHintShadow);
+    if (promptTapHintBody) promptParts.push(promptTapHintBody);
+    if (promptTapHintIcon) promptParts.push(promptTapHintIcon);
+    if (promptTapHintRing) promptParts.push(promptTapHintRing);
 
     /** Distance from player body center to an entity's pos. */
     function playerDistTo(entity) {
@@ -108,12 +165,11 @@ export function setupChoiceInteraction(k, opts) {
      * Returns the index of the tapped choice, or -1 if none.
      */
     function getTappedVisibleChoiceIndex(pos) {
-        if (getMinDistanceToChoices() > proximityRadius) return -1;
-        for (let i = 0; i < choices.length; i++) {
-            const d = Math.hypot(pos.x - choices[i].pos.x, pos.y - choices[i].pos.y);
-            if (d <= tapRadius) return i;
-        }
-        return -1;
+        const closestIdx = getClosestChoiceIndex();
+        if (closestIdx < 0) return -1;
+        const choice = choices[closestIdx];
+        const d = Math.hypot(pos.x - choice.pos.x, pos.y - choice.pos.y);
+        return d <= tapRadius ? closestIdx : -1;
     }
 
     /** Fire success for the given choice index (shared by keyboard and tap). */
@@ -146,16 +202,47 @@ export function setupChoiceInteraction(k, opts) {
         promptFade += (fadeTarget - promptFade) * Math.min(1, k.dt() * 12);
         const px = player.pos.x + bodyOff.x;
         const py = player.pos.y + bodyOff.y + 30;
-        promptKeyShadow.pos.x = px;
-        promptKeyShadow.pos.y = py + 1;
-        promptKeyBody.pos.x = px;
-        promptKeyBody.pos.y = py;
-        promptKeyLabel.pos.x = px;
-        promptKeyLabel.pos.y = py + 0.5;
+        if (promptKeyShadow && promptKeyBody && promptKeyLabel) {
+            promptKeyShadow.pos.x = px;
+            promptKeyShadow.pos.y = py + 1;
+            promptKeyBody.pos.x = px;
+            promptKeyBody.pos.y = py;
+            promptKeyLabel.pos.x = px;
+            promptKeyLabel.pos.y = py + 0.5;
+        }
+        if (
+            isTouchDevice &&
+            promptTapHintShadow &&
+            promptTapHintBody &&
+            promptTapHintIcon &&
+            promptTapHintRing
+        ) {
+            const tapHintX = px;
+            const tapHintY = py;
+            const promptPulse = 1 + Math.sin(pulseTime * 5.4) * 0.05;
+            const ringPulse = 1 + Math.sin(pulseTime * 6.2) * 0.18;
+            promptTapHintShadow.pos.x = tapHintX;
+            promptTapHintShadow.pos.y = tapHintY + 1;
+            promptTapHintBody.pos.x = tapHintX;
+            promptTapHintBody.pos.y = tapHintY;
+            promptTapHintIcon.pos.x = tapHintX;
+            promptTapHintIcon.pos.y = tapHintY - 0.4;
+            promptTapHintRing.pos.x = tapHintX + 3.2;
+            promptTapHintRing.pos.y = tapHintY - 9.0;
+            promptTapHintShadow.opacity = promptFade * 0.45;
+            promptTapHintBody.opacity = promptFade;
+            promptTapHintIcon.opacity = promptFade;
+            promptTapHintRing.opacity = promptFade * 0.32;
+            setUniformScale(promptTapHintBody, promptPulse);
+            setUniformScale(promptTapHintIcon, (hasTapIconSprite ? 1.56 : 1) * (1 + Math.sin(pulseTime * 5.8) * 0.06));
+            setUniformScale(promptTapHintRing, ringPulse);
+        }
 
-        promptKeyShadow.opacity = promptFade * 0.5;
-        promptKeyBody.opacity = promptFade;
-        promptKeyLabel.opacity = promptFade;
+        if (promptKeyShadow && promptKeyBody && promptKeyLabel) {
+            promptKeyShadow.opacity = promptFade * 0.5;
+            promptKeyBody.opacity = promptFade;
+            promptKeyLabel.opacity = promptFade;
+        }
 
         if (onRangeTick) onRangeTick(inRange, pulseTime, false, closestIdx);
     });

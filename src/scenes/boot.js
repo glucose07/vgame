@@ -44,6 +44,7 @@ export default function bootScene(k) {
                 "idle-left": { from: 8, to: 9, speed: 2, loop: true },
             },
         }],
+        ["finger_icon", "assets/characters/finger.png"],
         ["butterfly_sheet", "assets/animals/Butterfly.png", {
             // 16x64 sheet: 2 columns x 8 rows (8x8 frames)
             sliceX: 2,
