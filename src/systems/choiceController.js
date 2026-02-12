@@ -1,7 +1,6 @@
 /**
  * Choice controller (M4): proximity prompt and one-time interact.
- * Shows "(E) Interact" / "Tap" when player is near any choice; on E or tap triggers success once and locks.
- * Tap interaction targets the roses directly — only fires when the choice label is visible on the rose.
+ * Shows an E-key indicator when player is near any choice; on E or tap triggers success once and locks.
  * Supports both keyboard (E) and touch/click on choices for mobile play.
  *
  * @returns {{ isTapOnVisibleChoice: (pos: {x:number,y:number}) => boolean }}
@@ -15,35 +14,61 @@ const DEFAULT_TAP_RADIUS = 60; // how close a tap must be to a choice center to 
  * @param {object} opts
  * @param {object} opts.player - Player entity with pos (vec2)
  * @param {object[]} opts.choices - Array of choice entities with pos (vec2)
- * @param {object[]} [opts.choiceLabels] - Text entities on each rose (used to check visibility for tap)
  * @param {string[]} [opts.labels] - Optional labels for each choice (for logging)
  * @param {number} [opts.proximityRadius] - Distance at which prompt appears
- * @param {() => void} opts.onSuccess - Called once when player interacts; then interactions disabled
+ * @param {(inRange: boolean) => void} [opts.onRangeChange] - Proximity state callback
+ * @param {(inRange: boolean, pulseTime: number, successFired: boolean, closestIdx: number) => void} [opts.onRangeTick]
+ *        Called every frame to drive external visual feedback (e.g., rose pulse/glow).
+ * @param {(choiceIndex: number) => void} opts.onSuccess - Called once when player interacts; then interactions disabled
  */
 export function setupChoiceInteraction(k, opts) {
     const player = opts.player;
     const bodyOff = opts.playerBodyOffset || { x: 32, y: 40 };
     const choices = opts.choices;
-    const choiceLabels = opts.choiceLabels || [];
     const labels = opts.labels;
     const proximityRadius = opts.proximityRadius ?? DEFAULT_PROXIMITY_RADIUS;
     const tapRadius = opts.tapRadius ?? DEFAULT_TAP_RADIUS;
+    const onRangeChange = opts.onRangeChange;
+    const onRangeTick = opts.onRangeTick;
     const onSuccess = opts.onSuccess;
 
     let successFired = false;
+    let lastInRange = false;
+    let pulseTime = 0;
+    let promptFade = 0;
 
-    // Detect touch-capable device for prompt text
+    // Detect touch-capable device for tap support.
     const isTouchDevice = ("ontouchstart" in globalThis) || (navigator.maxTouchPoints > 0);
-    const promptText = isTouchDevice ? "Tap" : "(E) Interact";
-
-    const prompt = k.add([
-        k.text(promptText, { size: 16, font: "Nunito" }),
+    // E-key prompt body.
+    const promptKeyShadow = k.add([
+        k.rect(20, 20, { radius: 5 }),
+        k.pos(0, 0),
+        k.anchor("center"),
+        k.color(40, 30, 30),
+        k.opacity(0),
+        k.z(225),
+        "choicePrompt",
+    ]);
+    const promptKeyBody = k.add([
+        k.rect(18, 18, { radius: 4 }),
         k.pos(0, 0),
         k.anchor("center"),
         k.color(255, 255, 255),
         k.opacity(0),
+        k.z(226),
         "choicePrompt",
     ]);
+    const promptKeyLabel = k.add([
+        k.text("E", { size: 12, font: "Nunito" }),
+        k.pos(0, 0),
+        k.anchor("center"),
+        k.color(60, 40, 50),
+        k.opacity(0),
+        k.z(227),
+        "choicePrompt",
+    ]);
+
+    const promptParts = [promptKeyShadow, promptKeyBody, promptKeyLabel];
 
     /** Distance from player body center to an entity's pos. */
     function playerDistTo(entity) {
@@ -79,13 +104,12 @@ export function setupChoiceInteraction(k, opts) {
     }
 
     /**
-     * Check if a screen position hits a visible choice (label opacity > 0.5).
+     * Check if a screen position hits a choice while player is in range.
      * Returns the index of the tapped choice, or -1 if none.
      */
     function getTappedVisibleChoiceIndex(pos) {
+        if (getMinDistanceToChoices() > proximityRadius) return -1;
         for (let i = 0; i < choices.length; i++) {
-            const labelVisible = choiceLabels[i] && choiceLabels[i].opacity > 0.5;
-            if (!labelVisible) continue;
             const d = Math.hypot(pos.x - choices[i].pos.x, pos.y - choices[i].pos.y);
             if (d <= tapRadius) return i;
         }
@@ -95,27 +119,48 @@ export function setupChoiceInteraction(k, opts) {
     /** Fire success for the given choice index (shared by keyboard and tap). */
     function fireSuccess(closestIdx) {
         successFired = true;
+        if (onRangeChange && lastInRange) onRangeChange(false);
         const label = labels && labels[closestIdx] != null ? labels[closestIdx] : `choice ${closestIdx}`;
         console.log("[Choice] Selected:", label, "(index", closestIdx + "); success fired, interactions locked.");
-        onSuccess();
+        onSuccess(closestIdx);
     }
 
     k.onUpdate(() => {
+        pulseTime += k.dt();
+
         if (successFired) {
-            prompt.opacity = 0;
+            promptFade = 0;
+            for (const part of promptParts) part.opacity = 0;
+            if (onRangeTick) onRangeTick(false, pulseTime, true, -1);
             return;
         }
-        const d = getMinDistanceToChoices();
-        if (d <= proximityRadius) {
-            prompt.opacity = 1;
-            prompt.pos.x = player.pos.x + bodyOff.x;
-            prompt.pos.y = player.pos.y + bodyOff.y + 30; // below the player body with a small gap
-        } else {
-            prompt.opacity = 0;
+
+        const closestIdx = getClosestChoiceIndex();
+        const inRange = closestIdx >= 0;
+        if (inRange !== lastInRange) {
+            lastInRange = inRange;
+            if (onRangeChange) onRangeChange(inRange);
         }
+
+        const fadeTarget = inRange ? 1 : 0;
+        promptFade += (fadeTarget - promptFade) * Math.min(1, k.dt() * 12);
+        const px = player.pos.x + bodyOff.x;
+        const py = player.pos.y + bodyOff.y + 30;
+        promptKeyShadow.pos.x = px;
+        promptKeyShadow.pos.y = py + 1;
+        promptKeyBody.pos.x = px;
+        promptKeyBody.pos.y = py;
+        promptKeyLabel.pos.x = px;
+        promptKeyLabel.pos.y = py + 0.5;
+
+        promptKeyShadow.opacity = promptFade * 0.5;
+        promptKeyBody.opacity = promptFade;
+        promptKeyLabel.opacity = promptFade;
+
+        if (onRangeTick) onRangeTick(inRange, pulseTime, false, closestIdx);
     });
 
-    // Keyboard interaction (E key) — requires player proximity
+    // Keyboard interaction (E key) - requires player proximity
     k.onKeyPress("e", () => {
         if (successFired) return;
         const closestIdx = getClosestChoiceIndex();
@@ -123,7 +168,7 @@ export function setupChoiceInteraction(k, opts) {
         fireSuccess(closestIdx);
     });
 
-    // Touch-only interaction — tap directly on a rose whose label is visible (mobile only)
+    // Touch-only interaction - tap directly on a rose while in interaction range (mobile only)
     if (isTouchDevice) {
         k.onClick(() => {
             if (successFired) return;

@@ -409,32 +409,41 @@ export default function gameScene(k) {
             ? k.sprite(flowerChoiceSprite, { frame: hasFlowersAnimSheet ? 0 : 0 })
             : k.circle(choiceRadius),
         k.pos(rosesCenterX, rose1Y),
-        ...(hasFlowerChoiceSprite ? [k.anchor("center"), k.scale(choiceFlowerScale)] : [k.color(200, 50, 50)]),
+        ...(hasFlowerChoiceSprite ? [k.anchor("center"), k.scale(choiceFlowerScale)] : [k.color(200, 50, 50), k.scale(1)]),
+        k.opacity(1),
+        k.z(120),
         "choice",
     ]);
     if (hasFlowersAnimSheet) choice1.play("sway-row-1");
-    const choiceLabel1 = k.add([
-        k.text("Yes", { size: 14, font: "Nunito" }),
-        k.pos(rosesCenterX, rose1Y),
-        k.anchor("center"),
-        k.color(255, 255, 255),
-        k.opacity(0),
-    ]);
     const choice2 = k.add([
         hasFlowerChoiceSprite
             ? k.sprite(flowerChoiceSprite, { frame: hasFlowersAnimSheet ? 24 : 4 })
             : k.circle(choiceRadius),
         k.pos(rosesCenterX, rose2Y),
-        ...(hasFlowerChoiceSprite ? [k.anchor("center"), k.scale(choiceFlowerScale)] : [k.color(200, 50, 50)]),
+        ...(hasFlowerChoiceSprite ? [k.anchor("center"), k.scale(choiceFlowerScale)] : [k.color(200, 50, 50), k.scale(1)]),
+        k.opacity(1),
+        k.z(120),
         "choice",
     ]);
     if (hasFlowersAnimSheet) choice2.play("sway-row-5");
-    const choiceLabel2 = k.add([
-        k.text("You already said yes", { size: 12, font: "Nunito" }),
+    const roseGlowColor = [255, 130, 170];
+    const choiceGlow1 = k.add([
+        k.circle(choiceRadius + 10),
+        k.pos(rosesCenterX, rose1Y),
+        k.anchor("center"),
+        k.color(...roseGlowColor),
+        k.scale(1),
+        k.opacity(0),
+        k.z(119),
+    ]);
+    const choiceGlow2 = k.add([
+        k.circle(choiceRadius + 10),
         k.pos(rosesCenterX, rose2Y),
         k.anchor("center"),
-        k.color(255, 255, 255),
+        k.color(...roseGlowColor),
+        k.scale(1),
         k.opacity(0),
+        k.z(119),
     ]);
 
     // ---- M4: NPC placeholder — to the right of clearing center, speech bubble above ----
@@ -660,14 +669,73 @@ export default function gameScene(k) {
     });
 
     // ---- M4: Proximity prompt + one-time interact (choiceController) ----
+    const setUniformScale = (entity, value) => {
+        if (!entity.scale) {
+            entity.scale = k.vec2(value, value);
+            return;
+        }
+        if (typeof entity.scale === "number") {
+            entity.scale = k.vec2(value, value);
+            return;
+        }
+        entity.scale.x = value;
+        entity.scale.y = value;
+    };
+    const getUniformScale = (entity, fallback = 1) => {
+        if (!entity.scale) return fallback;
+        if (typeof entity.scale === "number") return entity.scale;
+        if (typeof entity.scale.x === "number") return entity.scale.x;
+        return fallback;
+    };
+    const roseChoices = [choice1, choice2];
+    const roseGlows = [choiceGlow1, choiceGlow2];
+    const baseChoiceScales = roseChoices.map((choice) => getUniformScale(choice, hasFlowerChoiceSprite ? choiceFlowerScale : 1));
+    const interactionState = {
+        inRange: false,
+        successFired: false,
+        selectedChoiceIndex: -1,
+        closestChoiceIndex: -1,
+    };
+
     const choiceSuccessBus = k.add([]);
     const choiceController = setupChoiceInteraction(k, {
         player,
         playerBodyOffset: { x: playerBodyOffsetX, y: playerBodyOffsetY },
-        choices: [choice1, choice2],
-        labels: ["Yes", "You already said yes"],
-        choiceLabels: [choiceLabel1, choiceLabel2],
-        onSuccess: () => choiceSuccessBus.trigger("choiceSuccess"),
+        choices: roseChoices,
+        labels: ["Yes!!", "I already said yes TT"],
+        onRangeChange: (inRange) => {
+            interactionState.inRange = inRange;
+            if (!inRange) interactionState.closestChoiceIndex = -1;
+        },
+        onRangeTick: (inRange, pulseTime, successFired, closestIdx) => {
+            interactionState.inRange = inRange;
+            interactionState.successFired = successFired;
+            interactionState.closestChoiceIndex = closestIdx;
+            const pulseScale = 1 + Math.sin(pulseTime * 5.4) * 0.04;
+            const glowPulse = 1 + Math.sin(pulseTime * 5.4 + 0.4) * 0.14;
+            const activeIdx = successFired ? interactionState.selectedChoiceIndex : closestIdx;
+            for (let i = 0; i < roseChoices.length; i++) {
+                const choice = roseChoices[i];
+                const glow = roseGlows[i];
+                const isActive = (inRange || successFired) && i === activeIdx;
+                if (!isActive) {
+                    setUniformScale(choice, baseChoiceScales[i]);
+                    choice.opacity = 1;
+                    glow.opacity = 0;
+                    setUniformScale(glow, 1);
+                    continue;
+                }
+                setUniformScale(choice, baseChoiceScales[i] * pulseScale);
+                choice.opacity = 0.94 + (Math.sin(pulseTime * 5.4 + i * 0.8) + 1) * 0.03;
+                setUniformScale(glow, glowPulse);
+                glow.opacity = 0.16 + (Math.sin(pulseTime * 5.4 + i * 0.6) + 1) * 0.07;
+            }
+        },
+        onSuccess: (choiceIdx) => {
+            interactionState.selectedChoiceIndex = choiceIdx;
+            interactionState.successFired = true;
+            choiceSuccessBus.trigger("choiceSuccess", choiceIdx);
+        },
     });
 
     // ---- M5: Petal effects (ambient + burst on success) ----
@@ -678,7 +746,7 @@ export default function gameScene(k) {
         successBus: choiceSuccessBus,
     });
 
-    // ---- M6: UI text — speech bubble from NPC + success message ----
+    // ---- M6: UI text - speech bubble with interaction choices ----
     setupUI(k, {
         clearingCenter: { x: clearingCenterX, y: clearingCenterY },
         clearingRadius,
@@ -698,7 +766,7 @@ export default function gameScene(k) {
         },
         player,
         playerBodyOffset: { x: playerBodyOffsetX, y: playerBodyOffsetY },
-        choiceLabels: [choiceLabel1, choiceLabel2],
+        interactionState,
         worldW: w,
         worldH: h,
         successBus: choiceSuccessBus,
