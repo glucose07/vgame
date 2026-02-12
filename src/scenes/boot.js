@@ -13,9 +13,6 @@ export default function bootScene(k) {
     // Optional: try to load manifest assets if present; never block on missing files.
     // With Vite, put assets in public/ so they're served (e.g. public/assets/tiles/...).
     const optionalAssets = [
-        ["rose_field_tile", "assets/tiles/rose_field_tile.png"],
-        ["unnamed_tile", "assets/tiles/unnamed_tile.png"],
-        ["path_tile", "assets/tiles/path_tile.png"],
         ["player_sheet", "assets/characters/player_sheet.png", {
             sliceX: 8,
             sliceY: 14,

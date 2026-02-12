@@ -115,25 +115,76 @@ export default function gameScene(k) {
 
     // ---- M4: NPC placeholder — to the right of clearing center, speech bubble above ----
     const npcSize = 192;
-    const npcX = clearingCenterX + 60;
-    const npcY = clearingCenterY - npcSize / 2;
+    const npcScale = 3;
+    const npcPlacementOffsetX = -24; // move NPC a bit left in the clearing
+    const npcPlacementOffsetY = -18; // move NPC a bit up toward path centerline
+    // Measured from npc_sheet frame 8/9 (64x64): visible body lives inside this sub-rect.
+    const npcVisibleFrameRect = { x: 26, y: 21, w: 13, h: 20 };
+    // Keep the same intended NPC body center used by prior placeholder layout.
+    const npcBodyCenter = {
+        x: clearingCenterX + 60 + npcSize / 2 + npcPlacementOffsetX,
+        y: clearingCenterY + npcPlacementOffsetY,
+    };
+    // Shift draw position so the visible body (not transparent frame) is centered at npcBodyCenter.
+    const npcDrawX = npcBodyCenter.x
+        - (npcVisibleFrameRect.x + npcVisibleFrameRect.w / 2) * npcScale;
+    const npcDrawY = npcBodyCenter.y
+        - (npcVisibleFrameRect.y + npcVisibleFrameRect.h / 2) * npcScale;
     const hasNpcSprite = !!k.getSprite("npc_sheet");
     const npc = k.add([
         hasNpcSprite ? k.sprite("npc_sheet", { frame: 8 }) : k.rect(npcSize, npcSize),
-        k.pos(npcX, npcY),
+        k.pos(npcDrawX, npcDrawY),
         ...(hasNpcSprite
-            ? [k.scale(-3, 3), k.anchor("topright")]
+            ? [k.scale(npcScale), k.anchor("topleft")]
             : [k.anchor("topleft"), k.color(100, 90, 140)]),
     ]);
     if (hasNpcSprite) {
         npc.play("idle-left");
+        npc.flipX = true;
     }
+
+    const getNpcWorldMetrics = () => {
+        if (!hasNpcSprite) {
+            const left = npc.pos.x;
+            const top = npc.pos.y;
+            const right = left + npcSize;
+            const bottom = top + npcSize;
+            return {
+                left,
+                top,
+                right,
+                bottom,
+                centerX: (left + right) / 2,
+                centerY: (top + bottom) / 2,
+            };
+        }
+
+        const left = npc.pos.x + npcVisibleFrameRect.x * npcScale;
+        const top = npc.pos.y + npcVisibleFrameRect.y * npcScale;
+        const right = left + npcVisibleFrameRect.w * npcScale;
+        const bottom = top + npcVisibleFrameRect.h * npcScale;
+        return {
+            left,
+            top,
+            right,
+            bottom,
+            centerX: (left + right) / 2,
+            centerY: (top + bottom) / 2,
+        };
+    };
 
     // ---- M2: Player — sprite if loaded, else rect; onKeyDown move; spawn at path start ----
     const hasPlayerSprite = !!k.getSprite("player_sheet");
+    const playerFrameSize = 64;
+    const playerScale = 3;
+    // Measured from player_sheet 64x64 frames: visible pixels are around y=19..40.
+    const playerVisibleFrameRect = { x: 24, y: 19, w: 16, h: 22 };
+    const playerW = playerFrameSize * playerScale;
+    const playerH = playerFrameSize * playerScale;
     const player = k.add([
-        hasPlayerSprite ? k.sprite("player_sheet", { frame: 0 }) : k.rect(64, 64),
-        k.pos(40, h / 2 - 32),
+        hasPlayerSprite ? k.sprite("player_sheet", { frame: 0 }) : k.rect(playerFrameSize, playerFrameSize),
+        k.pos(40, h / 2 - playerH / 2),
+        k.scale(playerScale),
         k.area(),
         ...(hasPlayerSprite ? [] : [k.color(200, 80, 80)]),
         "player",
@@ -173,11 +224,16 @@ export default function gameScene(k) {
     k.onKeyDown("s",     () => { clearMoveTarget(); setDir("down");  player.move(0, moveAmount); });
 
     // Clamp to world bounds + click-to-move towards target
-    const playerW = 64;
-    const playerH = 64;
-    // Approximate center of the visible character body within the 64×64 sprite frame
-    const playerBodyOffsetX = 32;  // horizontally centered in frame
-    const playerBodyOffsetY = 40;  // character's feet are near the bottom, center is lower
+    // Keep collision footprint intentionally smaller than the 3x visual sprite.
+    const playerBodyOffsetX = 32 * playerScale;
+    const playerBodyOffsetY = 40 * playerScale;
+    const playerBodyW = 32;
+    const playerBodyH = 44;
+    // Rose collisions need a slightly higher body probe so top-side rose hits aren't oversized.
+    const roseCollisionOffsetX = playerBodyOffsetX;
+    const roseCollisionOffsetY = playerBodyOffsetY - 20;
+    const roseCollisionBodyW = playerBodyW;
+    const roseCollisionBodyH = playerBodyH;
     const arrivalThreshold = 8;  // stop moving when this close to target
     k.onUpdate(() => {
         // ---- Animation switching ----
@@ -210,38 +266,59 @@ export default function gameScene(k) {
                 }
             }
         }
-        // Clamp to world bounds
-        player.pos.x = k.clamp(player.pos.x, 0, w - playerW);
-        player.pos.y = k.clamp(player.pos.y, 0, h - playerH);
+        // Clamp to world bounds.
+        // Keep X based on body footprint (already tuned), and Y based on visible sprite bounds.
+        const minPlayerX = -playerBodyOffsetX + playerBodyW / 2;
+        const maxPlayerX = w - playerBodyOffsetX - playerBodyW / 2;
+        const visibleTopOffset = playerVisibleFrameRect.y * playerScale;
+        const visibleBottomOffset = (playerVisibleFrameRect.y + playerVisibleFrameRect.h) * playerScale;
+        const minPlayerY = -visibleTopOffset + 2;
+        const maxPlayerY = h - visibleBottomOffset - 2;
+        player.pos.x = k.clamp(player.pos.x, minPlayerX, maxPlayerX);
+        player.pos.y = k.clamp(player.pos.y, minPlayerY, maxPlayerY);
 
         // Push player out of rose circles (solid borders)
-        // Use a smaller collision radius for the player body (not the full sprite frame)
+        // Use rose circle radius against the player's body box for tighter borders.
         const roses = [choice1, choice2];
-        const pcx = player.pos.x + playerBodyOffsetX;
-        const pcy = player.pos.y + playerBodyOffsetY;
-        const playerR = 16;
-        const collisionR = choiceRadius + playerR;
+        const roseCollisionRadius = choiceRadius - 1;
         for (const rose of roses) {
-            const dx = pcx - rose.pos.x;
-            const dy = pcy - rose.pos.y;
-            const dist = Math.hypot(dx, dy);
-            if (dist < collisionR && dist > 0) {
-                const push = collisionR - dist;
+            const pLeft = player.pos.x + roseCollisionOffsetX - roseCollisionBodyW / 2;
+            const pTop = player.pos.y + roseCollisionOffsetY - roseCollisionBodyH / 2;
+            const pRight = pLeft + roseCollisionBodyW;
+            const pBottom = pTop + roseCollisionBodyH;
+
+            const closestX = k.clamp(rose.pos.x, pLeft, pRight);
+            const closestY = k.clamp(rose.pos.y, pTop, pBottom);
+            let dx = closestX - rose.pos.x;
+            let dy = closestY - rose.pos.y;
+            let dist = Math.hypot(dx, dy);
+            if (dist < roseCollisionRadius) {
+                if (dist < 0.0001) {
+                    // Fallback: rose center is within player body box.
+                    dx = (player.pos.x + roseCollisionOffsetX) - rose.pos.x;
+                    dy = (player.pos.y + roseCollisionOffsetY) - rose.pos.y;
+                    dist = Math.hypot(dx, dy);
+                    if (dist < 0.0001) {
+                        dx = 0;
+                        dy = -1;
+                        dist = 1;
+                    }
+                }
+                const push = roseCollisionRadius - dist;
                 player.pos.x += (dx / dist) * push;
                 player.pos.y += (dy / dist) * push;
             }
         }
 
         // Push player out of NPC rect (solid border)
-        // Use a smaller collision box centered within the visual sprite frame
-        const npcCollisionW = 45;
-        const npcCollisionH = 45;
-        const npcLeft = npc.pos.x + (npcSize - npcCollisionW) / 2;
-        const npcTop = npc.pos.y + (npcSize - npcCollisionH) / 2;
+        // Anchor collision to the visible NPC body (ignores transparent sprite padding).
+        const npcMetrics = getNpcWorldMetrics();
+        const npcCollisionW = 34;
+        const npcCollisionH = 38;
+        const npcLeft = npcMetrics.centerX - npcCollisionW / 2;
+        const npcTop = npcMetrics.bottom - npcCollisionH;
         const npcRight = npcLeft + npcCollisionW;
         const npcBottom = npcTop + npcCollisionH;
-        const playerBodyW = 24;
-        const playerBodyH = 32;
         const pLeft = player.pos.x + playerBodyOffsetX - playerBodyW / 2;
         const pTop = player.pos.y + playerBodyOffsetY - playerBodyH / 2;
         const pRight = pLeft + playerBodyW;
@@ -281,7 +358,20 @@ export default function gameScene(k) {
     setupUI(k, {
         clearingCenter: { x: clearingCenterX, y: clearingCenterY },
         clearingRadius,
-        npcCenter: { x: npcX + npcSize / 2, y: npcY },
+        npcBodyCenter: {
+            x: getNpcWorldMetrics().centerX,
+            y: getNpcWorldMetrics().centerY,
+        },
+        npcBubbleAnchor: {
+            x: getNpcWorldMetrics().centerX,
+            y: getNpcWorldMetrics().top,
+        },
+        npcProximityRect: {
+            left: getNpcWorldMetrics().left,
+            top: getNpcWorldMetrics().top,
+            right: getNpcWorldMetrics().right,
+            bottom: getNpcWorldMetrics().bottom,
+        },
         player,
         playerBodyOffset: { x: playerBodyOffsetX, y: playerBodyOffsetY },
         choiceLabels: [choiceLabel1, choiceLabel2],

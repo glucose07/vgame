@@ -5,6 +5,7 @@
 
 const BUBBLE_PROXIMITY = 160; // player must be this close to clearing center
 const KISS_PROXIMITY = 60;    // player this close to NPC triggers the kiss message
+const KISS_SPACE_MARGIN = 24; // extra padding around NPC visible body for proximity checks
 const FONT = "Nunito";        // loaded in main.js from public/fonts/
 const QUESTION_MESSAGE = "Will you be my valentine?";
 const SUCCESS_MESSAGE = "Ah, knew you'd say yes <3";
@@ -44,8 +45,22 @@ function startTypewriter(k, textEntity, fullText, onDone) {
  * @param {object} opts
  */
 export function setupUI(k, opts) {
-    const { clearingCenter, clearingRadius, npcCenter, player, choiceLabels, worldW, worldH, successBus } = opts;
+    const {
+        clearingCenter,
+        clearingRadius,
+        npcCenter,
+        npcBodyCenter,
+        npcBubbleAnchor,
+        npcProximityRect,
+        player,
+        choiceLabels,
+        worldW,
+        worldH,
+        successBus,
+    } = opts;
     const bodyOff = opts.playerBodyOffset || { x: 32, y: 40 };
+    const npcForBubble = npcBubbleAnchor || npcCenter;
+    const npcForProximity = npcBodyCenter || npcCenter;
 
     // ---- Responsive sizing ----
     const fontSize = Math.round(Math.max(10, Math.min(worldW * 0.024, 16)));
@@ -59,8 +74,8 @@ export function setupUI(k, opts) {
     const tailH = 10;
 
     // Position bubble directly above NPC (roses are now to the left, so no overlap)
-    const bubbleX = Math.max(bubbleW / 2 + 8, Math.min(npcCenter.x, worldW - bubbleW / 2 - 8));
-    const idealBubbleY = npcCenter.y - tailH - bubbleH / 2 - 4;
+    const bubbleX = Math.max(bubbleW / 2 + 8, Math.min(npcForBubble.x, worldW - bubbleW / 2 - 8));
+    const idealBubbleY = npcForBubble.y - tailH - bubbleH / 2 - 4;
     const bubbleY = Math.max(bubbleH / 2 + 8, idealBubbleY);
 
     // ---- Name tag dimensions ----
@@ -92,7 +107,7 @@ export function setupUI(k, opts) {
         "speechBubbleBody",
     ]);
 
-    const tailX = Math.max(bubbleX - bubbleW / 2 + 20, Math.min(npcCenter.x, bubbleX + bubbleW / 2 - 20));
+    const tailX = Math.max(bubbleX - bubbleW / 2 + 20, Math.min(npcForBubble.x, bubbleX + bubbleW / 2 - 20));
     const tailY = bubbleY + bubbleH / 2;
     const bubbleTailBorder = k.add([
         k.polygon([k.vec2(-9, 0), k.vec2(9, 0), k.vec2(0, tailH + 3)]),
@@ -197,10 +212,20 @@ export function setupUI(k, opts) {
 
         // Typewriter swap when player is right next to the NPC
         if (state === "waiting" || state === "done") {
-            const npcDx = (player.pos.x + bodyOff.x) - npcCenter.x;
-            const npcDy = (player.pos.y + bodyOff.y) - npcCenter.y;
+            const px = player.pos.x + bodyOff.x;
+            const py = player.pos.y + bodyOff.y;
+            const npcDx = px - npcForProximity.x;
+            const npcDy = py - npcForProximity.y;
             const npcDist = Math.sqrt(npcDx * npcDx + npcDy * npcDy);
-            const isClose = npcDist <= KISS_PROXIMITY;
+            let inNpcSpace = false;
+            if (npcProximityRect) {
+                inNpcSpace =
+                    px >= npcProximityRect.left - KISS_SPACE_MARGIN &&
+                    px <= npcProximityRect.right + KISS_SPACE_MARGIN &&
+                    py >= npcProximityRect.top - KISS_SPACE_MARGIN &&
+                    py <= npcProximityRect.bottom + KISS_SPACE_MARGIN;
+            }
+            const isClose = inNpcSpace || npcDist <= KISS_PROXIMITY;
             if (isClose && !tooClose) {
                 // Just entered kiss range — typewriter the kiss message
                 tooClose = true;
