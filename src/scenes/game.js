@@ -139,21 +139,46 @@ export default function gameScene(k) {
         if (k.canvas && typeof k.canvas.focus === "function") k.canvas.focus();
     });
 
-    // move(dx, dy) is per frame; onKeyDown runs every frame while key held
+    // ---- Input: keyboard + touch/click-to-move ----
     const moveAmount = 200;
-    k.onKeyDown("left", () => { player.move(-moveAmount, 0); });
-    k.onKeyDown("right", () => { player.move(moveAmount, 0); });
-    k.onKeyDown("up", () => { player.move(0, -moveAmount); });
-    k.onKeyDown("down", () => { player.move(0, moveAmount); });
-    k.onKeyDown("a", () => { player.move(-moveAmount, 0); });
-    k.onKeyDown("d", () => { player.move(moveAmount, 0); });
-    k.onKeyDown("w", () => { player.move(0, -moveAmount); });
-    k.onKeyDown("s", () => { player.move(0, moveAmount); });
+    let moveTarget = null;   // {x, y} or null — set by click/touch, cleared on arrival or keyboard
 
-    // Clamp to world bounds (no physics walls needed while player uses pos().move())
+    // Click/touch sets a movement target (works on both desktop and mobile)
+    k.onClick(() => {
+        const mp = k.mousePos();
+        if (mp) moveTarget = { x: mp.x, y: mp.y };
+    });
+
+    // Keyboard movement — also cancels any active touch target
+    const clearMoveTarget = () => { moveTarget = null; };
+    k.onKeyDown("left",  () => { clearMoveTarget(); player.move(-moveAmount, 0); });
+    k.onKeyDown("right", () => { clearMoveTarget(); player.move(moveAmount, 0); });
+    k.onKeyDown("up",    () => { clearMoveTarget(); player.move(0, -moveAmount); });
+    k.onKeyDown("down",  () => { clearMoveTarget(); player.move(0, moveAmount); });
+    k.onKeyDown("a",     () => { clearMoveTarget(); player.move(-moveAmount, 0); });
+    k.onKeyDown("d",     () => { clearMoveTarget(); player.move(moveAmount, 0); });
+    k.onKeyDown("w",     () => { clearMoveTarget(); player.move(0, -moveAmount); });
+    k.onKeyDown("s",     () => { clearMoveTarget(); player.move(0, moveAmount); });
+
+    // Clamp to world bounds + click-to-move towards target
     const playerW = 32;
     const playerH = 32;
+    const arrivalThreshold = 8;  // stop moving when this close to target
     k.onUpdate(() => {
+        // Move toward click/touch target
+        if (moveTarget) {
+            const cx = player.pos.x + playerW / 2;
+            const cy = player.pos.y + playerH / 2;
+            const dx = moveTarget.x - cx;
+            const dy = moveTarget.y - cy;
+            const dist = Math.hypot(dx, dy);
+            if (dist < arrivalThreshold) {
+                moveTarget = null;
+            } else {
+                player.move((dx / dist) * moveAmount, (dy / dist) * moveAmount);
+            }
+        }
+        // Clamp
         player.pos.x = k.clamp(player.pos.x, 0, w - playerW);
         player.pos.y = k.clamp(player.pos.y, 0, h - playerH);
     });
