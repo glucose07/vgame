@@ -154,7 +154,7 @@ assets/
 - M0: ✅ Done
 - M1: ✅ Done
 - M2: ✅ Done
-- M3: Not started
+- M3: ✅ Done
 - M4: Not started
 - M5: Not started
 - M6: Not started
@@ -266,3 +266,4 @@ assets/
 - **M0:** Folder structure created (`src/scenes/`, `src/systems/`, `assets/` with tiles, props, characters, vfx, ui). Boot scene shows "Loading..." text, optionally tries to load manifest assets (never blocks), then transitions to Game. Game scene is placeholder (rect + "Game" text). Main.js registers both scenes and starts with `go("boot")`. Placeholder Mode A only; no dependency on PNGs.
 - **M1:** World bounds from scene `width()`/`height()` (viewport). Placeholder background: base rect + grid of small circles. Invisible borders: four static body + area walls at edges (opacity 0). Player not modified; M2 will use borders for constraint.
 - **M2:** `src/systems/playerController.js` added: keyboard (arrows + WASD), normalized velocity via body.vel, facing (up/down/left/right), isMoving state. Placeholder: rect player + direction triangle (brighter when moving). Game scene spawns single player entity with body (gravityScale: 0), area, and controller; collides with M1 walls. Animation state machine in place for future sprite sheet (walk/idle); no assets used.
+- **M3:** Placeholder Mode A only. Path = full-width horizontal strip (tan/sand rect, 72px tall) from left to right; clearing = single circle at path end (right side, radius 85px, lighter green). Player spawns at path start (left). No path/clearing assets; no interaction or NPC (M4).

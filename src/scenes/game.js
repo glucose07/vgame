@@ -2,6 +2,7 @@
  * Game scene (placeholder). Scene wiring for M0.
  * M1: World bounds from viewport, placeholder background fill. Bounds enforced by clamp (no physics walls).
  * M2: Player — minimal: rect + arrow/WASD movement only (animations/sprites later).
+ * M3: Path strip (placeholder colored rect) from spawn toward clearing; clearing = circle overlay at path end.
  */
 
 /**
@@ -17,11 +18,10 @@ function getWorldBounds(k) {
 
 export default function gameScene(k) {
     const { width: w, height: h } = getWorldBounds(k);
-    console.log(w, h);
 
     // ---- M1: Background — rose tile if loaded, else placeholder ----
     const tileSize = 120;
-    if (k.getSprite("rose_field_tile")) {
+    if (k.getSprite("rose_field_tile") && false) {
         for (let x = 0; x < w + tileSize; x += tileSize) {
             for (let y = 0; y < h + tileSize; y += tileSize) {
                 k.add([
@@ -32,54 +32,55 @@ export default function gameScene(k) {
             }
         }
     } else {
-        // k.add([
-        //     k.rect(w, h),
-        //     k.pos(0, 0),
-        //     k.anchor("topleft"),
-        //     k.color(80, 120, 60),
-        // ]);
+        k.add([
+            k.rect(w, h),
+            k.pos(0, 0),
+            k.anchor("topleft"),
+            k.color(80, 120, 60),
+        ]);
 
-        // k.add([
-        //     k.sprite("unnamed_tile", {
-        //         width:  w,   // rectangle width in pixels
-        //         height: h,   // rectangle height in pixels
-        //     }),
-        //     k.pos(0, 0),
-        //     // k.anchor("topleft"),
-        // ]);
-
-        // for (let x = 0; x < w + tileSize; x += tileSize) {
-        //     for (let y = 0; y < h + tileSize; y += tileSize) {
-        //         k.add([
-        //             k.circle(4),
-        //             k.pos(x + tileSize / 2, y + tileSize / 2),
-        //             k.color(100, 140, 80),
-        //         ]);
-        //     }
-        // }
+        for (let x = 0; x < w + tileSize; x += tileSize) {
+            for (let y = 0; y < h + tileSize; y += tileSize) {
+                k.add([
+                    k.circle(4),
+                    k.pos(x + tileSize / 2, y + tileSize / 2),
+                    k.color(100, 140, 80),
+                ]);
+            }
+        }
     }
 
-    // ---- Path strip (if path_tile loaded) ----
-    // if (k.getSprite("path_tile")) {
-    //     const pathW = w;
-    //     const pathH = tileSize * 2;
-    //     for (let x = 0; x < pathW + tileSize; x += tileSize) {
-    //         for (let py = 0; py < pathH; py += tileSize) {
-    //             k.add([
-    //                 k.sprite("path_tile"),
-    //                 k.pos(x, h / 2 - pathH / 2 + py),
-    //                 k.anchor("topleft"),
-    //             ]);
-    //         }
-    //     }
-    // }
+    // ---- M3: Clearing geometry (defined first so path can end at circle) ----
+    const clearingPaddingFraction = 0.1;
+    const clearingRadius = 225;
+    const clearingCenterX = w * (1 - clearingPaddingFraction) - clearingRadius;
+    const clearingCenterY = h / 2;
 
-    // ---- M2: Player — sprite if loaded, else rect; onKeyDown move ----
+    // ---- M3: Path strip from spawn to clearing (extends a bit into circle to merge) ----
+    const pathStripHeight = 72;
+    const pathStripY = h / 2 - pathStripHeight / 2;
+    const pathIntoClearing = clearingRadius * 0.3;
+    const pathStripLength = clearingCenterX - clearingRadius + pathIntoClearing;
+    k.add([
+        k.rect(pathStripLength, pathStripHeight),
+        k.pos(0, pathStripY),
+        k.anchor("topleft"),
+        k.color(180, 155, 110),
+    ]);
+
+    // ---- M3: Clearing circle at end of path ----
+    k.add([
+        k.circle(clearingRadius),
+        k.pos(clearingCenterX, clearingCenterY),
+        k.color(160, 190, 130),
+    ]);
+
+    // ---- M2: Player — sprite if loaded, else rect; onKeyDown move; spawn at path start ----
     // const hasPlayerSprite = k.getSprite("player_sheet");
     const hasPlayerSprite = false;
     const player = k.add([
         hasPlayerSprite ? k.sprite("player_sheet") : k.rect(32, 32),
-        k.pos(k.center().x, k.center().y),
+        k.pos(40, h / 2 - 16),
         k.area(),
         ...(hasPlayerSprite ? [] : [k.color(200, 80, 80)]),
         "player",
