@@ -139,15 +139,20 @@ export default function gameScene(k) {
         if (k.canvas && typeof k.canvas.focus === "function") k.canvas.focus();
     });
 
-    // ---- Input: keyboard + touch/click-to-move ----
+    // ---- Input: keyboard + touch-to-move (touch only, not mouse) ----
     const moveAmount = 200;
-    let moveTarget = null;   // {x, y} or null — set by click/touch, cleared on arrival or keyboard
+    let moveTarget = null;   // {x, y} or null — set by touch, cleared on arrival or keyboard
+    const isTouchDevice = ("ontouchstart" in globalThis) || (navigator.maxTouchPoints > 0);
 
-    // Click/touch sets a movement target (works on both desktop and mobile)
-    k.onClick(() => {
-        const mp = k.mousePos();
-        if (mp) moveTarget = { x: mp.x, y: mp.y };
-    });
+    // Touch-to-move: only on mobile/touch devices so desktop mouse clicks don't interfere
+    if (isTouchDevice) {
+        k.onClick(() => {
+            const mp = k.mousePos();
+            if (!mp) return;
+            if (choiceController && choiceController.isTapOnVisibleChoice(mp)) return;
+            moveTarget = { x: mp.x, y: mp.y };
+        });
+    }
 
     // Keyboard movement — also cancels any active touch target
     const clearMoveTarget = () => { moveTarget = null; };
@@ -178,17 +183,55 @@ export default function gameScene(k) {
                 player.move((dx / dist) * moveAmount, (dy / dist) * moveAmount);
             }
         }
-        // Clamp
+        // Clamp to world bounds
         player.pos.x = k.clamp(player.pos.x, 0, w - playerW);
         player.pos.y = k.clamp(player.pos.y, 0, h - playerH);
+
+        // Push player out of rose circles (solid borders)
+        const roses = [choice1, choice2];
+        const pcx = player.pos.x + playerW / 2;
+        const pcy = player.pos.y + playerH / 2;
+        const playerR = playerW / 2;
+        const collisionR = choiceRadius + playerR;
+        for (const rose of roses) {
+            const dx = pcx - rose.pos.x;
+            const dy = pcy - rose.pos.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist < collisionR && dist > 0) {
+                const push = collisionR - dist;
+                player.pos.x += (dx / dist) * push;
+                player.pos.y += (dy / dist) * push;
+            }
+        }
+
+        // Push player out of NPC rect (solid border)
+        const npcLeft = npc.pos.x;
+        const npcTop = npc.pos.y;
+        const npcRight = npcLeft + npcSize;
+        const npcBottom = npcTop + npcSize;
+        const pLeft = player.pos.x;
+        const pTop = player.pos.y;
+        const pRight = pLeft + playerW;
+        const pBottom = pTop + playerH;
+        const overlapX = Math.min(pRight, npcRight) - Math.max(pLeft, npcLeft);
+        const overlapY = Math.min(pBottom, npcBottom) - Math.max(pTop, npcTop);
+        if (overlapX > 0 && overlapY > 0) {
+            // Push along the axis with the smallest overlap
+            if (overlapX < overlapY) {
+                player.pos.x += (pLeft < npcLeft) ? -overlapX : overlapX;
+            } else {
+                player.pos.y += (pTop < npcTop) ? -overlapY : overlapY;
+            }
+        }
     });
 
     // ---- M4: Proximity prompt + one-time interact (choiceController) ----
     const choiceSuccessBus = k.add([]);
-    setupChoiceInteraction(k, {
+    const choiceController = setupChoiceInteraction(k, {
         player,
         choices: [choice1, choice2],
         labels: ["Yes", "You already said yes"],
+        choiceLabels: [choiceLabel1, choiceLabel2],
         onSuccess: () => choiceSuccessBus.trigger("choiceSuccess"),
     });
 

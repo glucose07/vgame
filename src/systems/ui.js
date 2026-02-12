@@ -4,9 +4,11 @@
  */
 
 const BUBBLE_PROXIMITY = 160; // player must be this close to clearing center
+const KISS_PROXIMITY = 60;    // player this close to NPC triggers the kiss message
 const FONT = "Nunito";        // loaded in main.js from public/fonts/
 const QUESTION_MESSAGE = "Will you be my valentine?";
 const SUCCESS_MESSAGE = "Ah, knew you'd say yes <3";
+const KISS_MESSAGE = "Stop trying to kiss me :*";
 const TYPEWRITER_SPEED = 0.045; // seconds per character
 
 /**
@@ -155,6 +157,8 @@ export function setupUI(k, opts) {
     let state = "idle";
     let bubbleFade = 0;
     let successTriggered = false;
+    let tooClose = false;       // tracks whether player is in kiss range
+    let activeKissTw = null;    // active typewriter for kiss/restore transitions
     const fadeDur = 0.35;
 
     k.onUpdate(() => {
@@ -189,11 +193,33 @@ export function setupUI(k, opts) {
         for (const part of allProximityParts) {
             part.opacity = bubbleFade;
         }
+
+        // Typewriter swap when player is right next to the NPC
+        if (state === "waiting" || state === "done") {
+            const npcDx = (player.pos.x + 16) - npcCenter.x;
+            const npcDy = (player.pos.y + 16) - npcCenter.y;
+            const npcDist = Math.sqrt(npcDx * npcDx + npcDy * npcDy);
+            const isClose = npcDist <= KISS_PROXIMITY;
+            if (isClose && !tooClose) {
+                // Just entered kiss range — typewriter the kiss message
+                tooClose = true;
+                if (activeKissTw) activeKissTw.cancel();
+                activeKissTw = startTypewriter(k, msgText, KISS_MESSAGE);
+            } else if (!isClose && tooClose) {
+                // Just left kiss range — typewriter back to the normal message
+                tooClose = false;
+                if (activeKissTw) activeKissTw.cancel();
+                const restoreMsg = state === "waiting" ? QUESTION_MESSAGE : SUCCESS_MESSAGE;
+                activeKissTw = startTypewriter(k, msgText, restoreMsg);
+            }
+        }
     });
 
     // ---- On success: typewriter the smug message ----
     successBus.on("choiceSuccess", () => {
         successTriggered = true;
+        tooClose = false;
+        if (activeKissTw) { activeKissTw.cancel(); activeKissTw = null; }
         state = "typing_success";
 
         startTypewriter(k, msgText, SUCCESS_MESSAGE, () => {

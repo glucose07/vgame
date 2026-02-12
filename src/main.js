@@ -2,9 +2,12 @@ import kaplay from "kaplay";
 import bootScene from "./scenes/boot.js";
 import gameScene from "./scenes/game.js";
 
+const minGameWidth = 800;
+const scale = Math.min(1.25, window.innerWidth / minGameWidth);
+
 const k = kaplay({
     background: "#71BB47",
-    scale: 1.25,
+    scale,
 });
 
 // Load font BEFORE loadRoot so the URL isn't prefixed with "./"

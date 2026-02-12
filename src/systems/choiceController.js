@@ -1,7 +1,10 @@
 /**
  * Choice controller (M4): proximity prompt and one-time interact.
- * Shows "Press E" / "Tap" when player is near any choice; on E or tap triggers success once and locks.
+ * Shows "(E) Interact" / "Tap" when player is near any choice; on E or tap triggers success once and locks.
+ * Tap interaction targets the roses directly — only fires when the choice label is visible on the rose.
  * Supports both keyboard (E) and touch/click on choices for mobile play.
+ *
+ * @returns {{ isTapOnVisibleChoice: (pos: {x:number,y:number}) => boolean }}
  */
 
 const DEFAULT_PROXIMITY_RADIUS = 80;
@@ -12,6 +15,7 @@ const DEFAULT_TAP_RADIUS = 60; // how close a tap must be to a choice center to 
  * @param {object} opts
  * @param {object} opts.player - Player entity with pos (vec2)
  * @param {object[]} opts.choices - Array of choice entities with pos (vec2)
+ * @param {object[]} [opts.choiceLabels] - Text entities on each rose (used to check visibility for tap)
  * @param {string[]} [opts.labels] - Optional labels for each choice (for logging)
  * @param {number} [opts.proximityRadius] - Distance at which prompt appears
  * @param {() => void} opts.onSuccess - Called once when player interacts; then interactions disabled
@@ -19,6 +23,7 @@ const DEFAULT_TAP_RADIUS = 60; // how close a tap must be to a choice center to 
 export function setupChoiceInteraction(k, opts) {
     const player = opts.player;
     const choices = opts.choices;
+    const choiceLabels = opts.choiceLabels || [];
     const labels = opts.labels;
     const proximityRadius = opts.proximityRadius ?? DEFAULT_PROXIMITY_RADIUS;
     const tapRadius = opts.tapRadius ?? DEFAULT_TAP_RADIUS;
@@ -68,6 +73,20 @@ export function setupChoiceInteraction(k, opts) {
         return idx;
     }
 
+    /**
+     * Check if a screen position hits a visible choice (label opacity > 0.5).
+     * Returns the index of the tapped choice, or -1 if none.
+     */
+    function getTappedVisibleChoiceIndex(pos) {
+        for (let i = 0; i < choices.length; i++) {
+            const labelVisible = choiceLabels[i] && choiceLabels[i].opacity > 0.5;
+            if (!labelVisible) continue;
+            const d = Math.hypot(pos.x - choices[i].pos.x, pos.y - choices[i].pos.y);
+            if (d <= tapRadius) return i;
+        }
+        return -1;
+    }
+
     /** Fire success for the given choice index (shared by keyboard and tap). */
     function fireSuccess(closestIdx) {
         successFired = true;
@@ -91,7 +110,7 @@ export function setupChoiceInteraction(k, opts) {
         }
     });
 
-    // Keyboard interaction (E key)
+    // Keyboard interaction (E key) — requires player proximity
     k.onKeyPress("e", () => {
         if (successFired) return;
         const closestIdx = getClosestChoiceIndex();
@@ -99,17 +118,23 @@ export function setupChoiceInteraction(k, opts) {
         fireSuccess(closestIdx);
     });
 
-    // Touch / click interaction — tap on a choice while player is in proximity
-    k.onClick(() => {
-        if (successFired) return;
-        const closestIdx = getClosestChoiceIndex();
-        if (closestIdx < 0) return;          // player not near any choice
-        const mp = k.mousePos();
-        if (!mp) return;
-        const choice = choices[closestIdx];
-        const tapDist = Math.hypot(mp.x - choice.pos.x, mp.y - choice.pos.y);
-        if (tapDist <= tapRadius) {
-            fireSuccess(closestIdx);
-        }
-    });
+    // Touch-only interaction — tap directly on a rose whose label is visible (mobile only)
+    if (isTouchDevice) {
+        k.onClick(() => {
+            if (successFired) return;
+            const mp = k.mousePos();
+            if (!mp) return;
+            const tappedIdx = getTappedVisibleChoiceIndex(mp);
+            if (tappedIdx < 0) return;
+            fireSuccess(tappedIdx);
+        });
+    }
+
+    // Expose helper so game.js can prevent click-to-move when tapping a visible rose
+    return {
+        isTapOnVisibleChoice(pos) {
+            if (successFired) return false;
+            return getTappedVisibleChoiceIndex(pos) >= 0;
+        },
+    };
 }
