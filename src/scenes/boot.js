@@ -5,7 +5,7 @@
 export default function bootScene(k) {
     // Simple loading indicator (placeholder)
     k.add([
-        k.text("Loading...", { size: 24 }),
+        k.text("Loading...", { size: 24, font: "Nunito" }),
         k.anchor("center"),
         k.pos(k.center()),
     ]);

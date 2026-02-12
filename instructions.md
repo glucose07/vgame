@@ -157,7 +157,7 @@ assets/
 - M3: ✅ Done
 - M4: ✅ Done
 - M5: ✅ Done
-- M6: Not started
+- M6: ✅ Done
 
 ---
 
@@ -269,3 +269,4 @@ assets/
 - **M3:** Placeholder Mode A only. Path = full-width horizontal strip (tan/sand rect, 72px tall) from left to right; clearing = single circle at path end (right side, radius 85px, lighter green). Player spawns at path start (left). No path/clearing assets; no interaction or NPC (M4).
 - **M4:** NPC = purple rect in clearing. Two choice objects = red circles with white text ("Yes", "You already said yes") in clearing. Interaction in `src/systems/choiceController.js`: proximity radius 80px, "Press E" prompt above player when close; on E triggers success callback once then locks. Success fires `choiceSuccessBus.trigger("choiceSuccess")` for future M5/M6. Placeholder Mode A only; no rose PNGs.
 - **M5:** Effects in `src/systems/effects.js`. Ambient petals: up to 18 small pink/red circles drift down over clearing with sinusoidal sway, recycled when past clearing bottom. Burst petals: 40 particles explode radially from clearing center on `choiceSuccess` event, fade over 2s, self-cleanup (update loop cancels when all gone). `setupPetalEffects()` called from `game.js`, subscribes to existing `choiceSuccessBus`. Placeholder Mode A only; no petal PNGs.
+- **M6:** UI in `src/systems/ui.js`. "Will you be my valentine?" text centered horizontally above clearing with semi-transparent dark backdrop for readability. "Yay 💖" success message fades in (0.6s) at screen center on `choiceSuccess` event, also with dark backdrop. Font sizes responsive: question 18–32px, success 28–56px, scaled by viewport width. Question Y position clamped so text stays on-screen on small viewports. `setupUI()` wired from `game.js` via existing `choiceSuccessBus`. Placeholder Mode A only; no audio.

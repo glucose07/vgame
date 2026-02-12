@@ -8,6 +8,7 @@
 
 import { setupChoiceInteraction } from "../systems/choiceController.js";
 import { setupPetalEffects } from "../systems/effects.js";
+import { setupUI } from "../systems/ui.js";
 
 /**
  * Get world width and height from viewport (responsive: phone smaller, desktop larger).
@@ -79,22 +80,24 @@ export default function gameScene(k) {
         k.color(110, 155, 85),
     ]);
 
-    // ---- M4: Two choice objects (red circles + labels), vertically stacked; player approaches from left ----
+    // ---- M4: Two choice objects (red circles + labels), vertically stacked ----
+    // Roses sit to the LEFT of the NPC so the speech bubble above NPC has clear space
     const choiceRadius = 26;
-    const rosesCenterX = clearingCenterX + 50;
-    const rose1Y = clearingCenterY - 70;
-    const rose2Y = clearingCenterY + 70;
+    const rosesCenterX = clearingCenterX - 30;
+    const rose1Y = clearingCenterY - 60;
+    const rose2Y = clearingCenterY + 60;
     const choice1 = k.add([
         k.circle(choiceRadius),
         k.pos(rosesCenterX, rose1Y),
         k.color(200, 50, 50),
         "choice",
     ]);
-    k.add([
-        k.text("Yes", { size: 14 }),
+    const choiceLabel1 = k.add([
+        k.text("Yes", { size: 14, font: "Nunito" }),
         k.pos(rosesCenterX, rose1Y),
         k.anchor("center"),
         k.color(255, 255, 255),
+        k.opacity(0),
     ]);
     const choice2 = k.add([
         k.circle(choiceRadius),
@@ -102,18 +105,21 @@ export default function gameScene(k) {
         k.color(200, 50, 50),
         "choice",
     ]);
-    k.add([
-        k.text("You already said yes", { size: 12 }),
+    const choiceLabel2 = k.add([
+        k.text("You already said yes", { size: 12, font: "Nunito" }),
         k.pos(rosesCenterX, rose2Y),
         k.anchor("center"),
         k.color(255, 255, 255),
+        k.opacity(0),
     ]);
 
-    // ---- M4: NPC placeholder (same size as player), to the right of the roses ----
+    // ---- M4: NPC placeholder — to the right of clearing center, speech bubble above ----
     const npcSize = 32;
-    k.add([
+    const npcX = clearingCenterX + 60;
+    const npcY = clearingCenterY - npcSize / 2;
+    const npc = k.add([
         k.rect(npcSize, npcSize),
-        k.pos(rosesCenterX + choiceRadius * 2 + 28, clearingCenterY - npcSize / 2),
+        k.pos(npcX, npcY),
         k.anchor("topleft"),
         k.color(100, 90, 140),
     ]);
@@ -164,6 +170,18 @@ export default function gameScene(k) {
     // ---- M5: Petal effects (ambient + burst on success) ----
     setupPetalEffects(k, {
         clearingCenter: { x: clearingCenterX, y: clearingCenterY },
+        worldW: w,
+        worldH: h,
+        successBus: choiceSuccessBus,
+    });
+
+    // ---- M6: UI text — speech bubble from NPC + success message ----
+    setupUI(k, {
+        clearingCenter: { x: clearingCenterX, y: clearingCenterY },
+        clearingRadius,
+        npcCenter: { x: npcX + npcSize / 2, y: npcY },
+        player,
+        choiceLabels: [choiceLabel1, choiceLabel2],
         worldW: w,
         worldH: h,
         successBus: choiceSuccessBus,

@@ -24,7 +24,7 @@ export function setupChoiceInteraction(k, opts) {
     let successFired = false;
 
     const prompt = k.add([
-        k.text("Press E", { size: 16 }),
+        k.text("Press E", { size: 16, font: "Nunito" }),
         k.pos(0, 0),
         k.anchor("center"),
         k.color(255, 255, 255),

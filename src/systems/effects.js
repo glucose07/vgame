@@ -130,7 +130,7 @@ export function burstPetals(k, origin) {
         particles.push({ obj: petal, vx, vy, age: 0 });
     }
 
-    const cancel = k.onUpdate(() => {
+    const cancelBurst = k.onUpdate(() => {
         let alive = 0;
 
         for (let i = particles.length - 1; i >= 0; i--) {
@@ -159,7 +159,7 @@ export function burstPetals(k, origin) {
 
         // Cancel update loop once all particles are gone
         if (alive === 0 && particles.length === 0) {
-            cancel();
+            cancelBurst.cancel();
         }
     });
 }
