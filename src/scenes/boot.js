@@ -10,6 +10,15 @@ export default function bootScene(k) {
         k.pos(k.center()),
     ]);
 
+    const buildFlowerRowAnims = (speed = 3) => {
+        const anims = {};
+        for (let row = 0; row < 10; row++) {
+            const from = row * 6;
+            anims[`sway-row-${row + 1}`] = { from, to: from + 5, speed, loop: true };
+        }
+        return anims;
+    };
+
     // Optional: try to load manifest assets if present; never block on missing files.
     // With Vite, put assets in public/ so they're served (e.g. public/assets/tiles/...).
     const optionalAssets = [
@@ -74,10 +83,31 @@ export default function bootScene(k) {
             // 96x160 sheet: 6x10 frames (16x16 each)
             sliceX: 6,
             sliceY: 10,
-            anims: {
-                "sway-row-1": { from: 0, to: 5, speed: 3, loop: true },
-                "sway-row-5": { from: 24, to: 29, speed: 3, loop: true },
-            },
+            anims: buildFlowerRowAnims(3),
+        }],
+        ["flowers_anim_sheet_2", "assets/Outdoor decoration/Outdoor_Decor_Animations/Flower_Animations/Flowers_2_Anim.png", {
+            // 96x160 sheet: 6x10 frames (16x16 each)
+            sliceX: 6,
+            sliceY: 10,
+            anims: buildFlowerRowAnims(3),
+        }],
+        ["flowers_anim_sheet_3", "assets/Outdoor decoration/Outdoor_Decor_Animations/Flower_Animations/Flowers_3_Anim.png", {
+            // 96x160 sheet: 6x10 frames (16x16 each)
+            sliceX: 6,
+            sliceY: 10,
+            anims: buildFlowerRowAnims(3),
+        }],
+        ["flowers_anim_sheet_4", "assets/Outdoor decoration/Outdoor_Decor_Animations/Flower_Animations/Flowers_4_Anim.png", {
+            // 96x160 sheet: 6x10 frames (16x16 each)
+            sliceX: 6,
+            sliceY: 10,
+            anims: buildFlowerRowAnims(3),
+        }],
+        ["flowers_anim_sheet_5", "assets/Outdoor decoration/Outdoor_Decor_Animations/Flower_Animations/Flowers_5_Anim.png", {
+            // 96x160 sheet: 6x10 frames (16x16 each)
+            sliceX: 6,
+            sliceY: 10,
+            anims: buildFlowerRowAnims(3),
         }],
         ["grass_anim_1", "assets/Outdoor decoration/Outdoor_Decor_Animations/Grass_Animations/Grass_1_Anim.png", {
             // 128x16 sheet: 8x1 frames (16x16 each)

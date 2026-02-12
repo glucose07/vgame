@@ -6,6 +6,7 @@ const BUBBLE_PROXIMITY = 160; // fallback when no interactionState is provided
 const FONT = "Nunito";
 const QUESTION_MESSAGE = "Will you be my valentine?";
 const KISS_MESSAGE = "Stop trying to kiss me :*";
+const SUCCESS_MESSAGE = "Ah, I knew you liked me ^^";
 const KISS_PROXIMITY = 60;
 const KISS_SPACE_MARGIN = 24;
 const TOP_CHOICE_TEXT = "Yes!!";
@@ -68,6 +69,7 @@ export function setupUI(k, opts) {
         player,
         worldW,
         interactionState,
+        successBus,
     } = opts;
     const bodyOff = opts.playerBodyOffset || { x: 32, y: 40 };
     const npcForBubble = npcBubbleAnchor || npcCenter;
@@ -280,6 +282,7 @@ export function setupUI(k, opts) {
     let npcVisibleLast = false;
     let npcCurrentMessage = QUESTION_MESSAGE;
     let activeNpcTw = null;
+    let npcSuccessTriggered = false;
 
     let playerFade = 0;
     let playerScale = 0.86;
@@ -288,6 +291,17 @@ export function setupUI(k, opts) {
     let lastClosestIdx = -1;
     let playerCurrentMessage = "";
     let activePlayerTw = null;
+
+    if (successBus && typeof successBus.on === "function") {
+        successBus.on("choiceSuccess", () => {
+            npcSuccessTriggered = true;
+            if (activeNpcTw) activeNpcTw.cancel();
+            npcCurrentMessage = SUCCESS_MESSAGE;
+            activeNpcTw = startTypewriter(k, npcMessageText, npcCurrentMessage, () => {
+                activeNpcTw = null;
+            });
+        });
+    }
 
     function updatePlayerBubblePosition() {
         const px = player.pos.x + bodyOff.x;
@@ -346,7 +360,9 @@ export function setupUI(k, opts) {
         const npcDist = Math.sqrt(npcDx * npcDx + npcDy * npcDy);
         const isTooClose = inNpcSpace || npcDist <= KISS_PROXIMITY;
         const npcVisible = inClearingRange || isTooClose;
-        const targetNpcMessage = isTooClose ? KISS_MESSAGE : QUESTION_MESSAGE;
+        const targetNpcMessage = npcSuccessTriggered
+            ? SUCCESS_MESSAGE
+            : (isTooClose ? KISS_MESSAGE : QUESTION_MESSAGE);
         if (targetNpcMessage !== npcCurrentMessage) {
             npcCurrentMessage = targetNpcMessage;
             if (activeNpcTw) activeNpcTw.cancel();

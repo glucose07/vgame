@@ -223,6 +223,85 @@ export default function gameScene(k) {
         k.opacity(0.09),
     ]);
 
+    // ---- Flower field around path/clearing (dense, intermittent animation for performance) ----
+    const flowerFieldSheets = [
+        "flowers_anim_sheet",
+        "flowers_anim_sheet_2",
+        "flowers_anim_sheet_3",
+        "flowers_anim_sheet_4",
+        "flowers_anim_sheet_5",
+    ].filter((name) => !!k.getSprite(name));
+    if (flowerFieldSheets.length > 0) {
+        const flowerEntries = [];
+        const targetFlowers = Math.max(90, Math.round((w * h) / 6000));
+        const maxAttempts = targetFlowers * 36;
+        const pathPad = 10;
+        const clearingPad = 6;
+        const edgePad = 12;
+
+        const isOnPath = (x, y) =>
+            x >= -pathPad &&
+            x <= renderedPathLength + pathPad &&
+            y >= pathStripY - pathPad &&
+            y <= pathStripY + renderedPathHeight + pathPad;
+        const isInClearing = (x, y) => {
+            const dx = x - clearingCenterX;
+            const dy = y - clearingCenterY;
+            const r = clearingRadius + clearingPad;
+            return (dx * dx + dy * dy) <= (r * r);
+        };
+
+        for (let attempt = 0; attempt < maxAttempts && flowerEntries.length < targetFlowers; attempt++) {
+            const x = edgePad + Math.random() * Math.max(8, w - edgePad * 2);
+            const y = edgePad + Math.random() * Math.max(8, h - edgePad * 2);
+            if (isOnPath(x, y)) continue;
+            if (isInClearing(x, y)) continue;
+
+            const sheet = flowerFieldSheets[Math.floor(Math.random() * flowerFieldSheets.length)];
+            const row = Math.floor(Math.random() * 10);
+            const rowStart = row * 6;
+            const frame = rowStart + Math.floor(Math.random() * 6);
+            const anim = `sway-row-${row + 1}`;
+
+            const flower = k.add([
+                k.sprite(sheet, { frame }),
+                k.pos(x, y),
+                k.anchor("center"),
+                k.scale(2.0 + Math.random() * 1.4),
+                k.opacity(0.9),
+                k.z(10),
+            ]);
+
+            flowerEntries.push({
+                obj: flower,
+                anim,
+                rowStart,
+                burst: 0,
+                cooldown: 4 + Math.random() * 8,
+            });
+        }
+
+        k.onUpdate(() => {
+            const dt = k.dt();
+            for (const f of flowerEntries) {
+                if (f.burst > 0) {
+                    f.burst -= dt;
+                    if (f.burst <= 0) {
+                        if (typeof f.obj.stop === "function") f.obj.stop();
+                        f.obj.frame = f.rowStart + Math.floor(Math.random() * 6);
+                        f.cooldown = 7 + Math.random() * 11;
+                    }
+                    continue;
+                }
+                f.cooldown -= dt;
+                if (f.cooldown <= 0) {
+                    f.obj.play(f.anim);
+                    f.burst = 0.7 + Math.random() * 1.2;
+                }
+            }
+        });
+    }
+
     // ---- M3: Clearing circle at end of path ----
     const clearingGrassColor = [110, 155, 85];
     const clearingRimShadowColor = [72, 48, 30];
