@@ -79,6 +79,30 @@ export default function bootScene(k) {
                 "sway-row-5": { from: 24, to: 29, speed: 3, loop: true },
             },
         }],
+        ["grass_anim_1", "assets/Outdoor decoration/Outdoor_Decor_Animations/Grass_Animations/Grass_1_Anim.png", {
+            // 128x16 sheet: 8x1 frames (16x16 each)
+            sliceX: 8,
+            sliceY: 1,
+            anims: {
+                sway: { from: 0, to: 7, speed: 4, loop: true },
+            },
+        }],
+        ["grass_anim_2", "assets/Outdoor decoration/Outdoor_Decor_Animations/Grass_Animations/Grass_2_Anim.png", {
+            // 128x16 sheet: 8x1 frames (16x16 each)
+            sliceX: 8,
+            sliceY: 1,
+            anims: {
+                sway: { from: 0, to: 7, speed: 4, loop: true },
+            },
+        }],
+        ["grass_anim_3", "assets/Outdoor decoration/Outdoor_Decor_Animations/Grass_Animations/Grass_3_Anim.png", {
+            // 128x16 sheet: 8x1 frames (16x16 each)
+            sliceX: 8,
+            sliceY: 1,
+            anims: {
+                sway: { from: 0, to: 7, speed: 4, loop: true },
+            },
+        }],
     ];
     const loadPromises = optionalAssets.map(([name, path, opt]) =>
         Promise.resolve(k.loadSprite(name, path, opt || {})).catch(() => {})

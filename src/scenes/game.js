@@ -23,6 +23,7 @@ function getWorldBounds(k) {
 
 export default function gameScene(k) {
     const { width: w, height: h } = getWorldBounds(k);
+    const surroundingGrassColor = [62, 137, 72]; // #3e8948 for non-path/non-clearing ground
 
     // ---- M1: Background — rose tile if loaded, else placeholder ----
     const tileSize = 120;
@@ -41,18 +42,8 @@ export default function gameScene(k) {
             k.rect(w, h),
             k.pos(0, 0),
             k.anchor("topleft"),
-            k.color(80, 120, 60),
+            k.color(...surroundingGrassColor),
         ]);
-
-        for (let x = 0; x < w + tileSize; x += tileSize) {
-            for (let y = 0; y < h + tileSize; y += tileSize) {
-                k.add([
-                    k.circle(4),
-                    k.pos(x + tileSize / 2, y + tileSize / 2),
-                    k.color(100, 140, 80),
-                ]);
-            }
-        }
     }
 
     // ---- Ambient butterflies (rows 1, 4, 5 from Butterfly.png: blue/pink/red) ----
@@ -233,10 +224,39 @@ export default function gameScene(k) {
     ]);
 
     // ---- M3: Clearing circle at end of path ----
+    const clearingGrassColor = [110, 155, 85];
+    const clearingRimShadowColor = [72, 48, 30];
+    const clearingRimLayers = [
+        { inset: 0, opacity: 0.10 },
+        { inset: 7, opacity: 0.07 },
+        { inset: 14, opacity: 0.05 },
+    ];
+    const clearingRimInset = 20; // bring transition 10-20px inward from the edge
+
     k.add([
         k.circle(clearingRadius),
         k.pos(clearingCenterX, clearingCenterY),
-        k.color(110, 155, 85),
+        k.color(...clearingGrassColor),
+    ]);
+    for (const layer of clearingRimLayers) {
+        k.add([
+            k.circle(clearingRadius - layer.inset),
+            k.pos(clearingCenterX, clearingCenterY),
+            k.color(...clearingRimShadowColor),
+            k.opacity(layer.opacity),
+        ]);
+    }
+    // Restore and slightly lift the interior so the edge reads as a soft rim.
+    k.add([
+        k.circle(clearingRadius - clearingRimInset),
+        k.pos(clearingCenterX, clearingCenterY),
+        k.color(...clearingGrassColor),
+    ]);
+    k.add([
+        k.circle(clearingRadius - clearingRimInset - 5),
+        k.pos(clearingCenterX, clearingCenterY),
+        k.color(118, 164, 90),
+        k.opacity(0.12),
     ]);
 
     // ---- Ambient weather: drifting cloud shadows + occasional wind gust ----
@@ -445,6 +465,62 @@ export default function gameScene(k) {
         k.opacity(0),
         k.z(119),
     ]);
+    // ---- Sparse animated grass across grassy zones, excluding path + clearing ----
+    const grassAnimSprites = ["grass_anim_1", "grass_anim_2", "grass_anim_3"]
+        .filter((name) => !!k.getSprite(name));
+    if (grassAnimSprites.length > 0) {
+        const pathPad = 8;
+        const clearingNoGrassPad = 8;
+        const minDistFromChoices = 38;
+        const totalGrass = Math.max(8, Math.min(20, Math.round((w * h) / 70000)));
+        const maxAttempts = 900;
+
+        const isOnPath = (x, y) =>
+            x >= -pathPad &&
+            x <= renderedPathLength + pathPad &&
+            y >= pathStripY - pathPad &&
+            y <= pathStripY + renderedPathHeight + pathPad;
+        const isInClearing = (x, y) => {
+            const dx = x - clearingCenterX;
+            const dy = y - clearingCenterY;
+            const r = clearingRadius + clearingNoGrassPad;
+            return (dx * dx + dy * dy) <= (r * r);
+        };
+
+        const isNearChoice = (x, y) =>
+            Math.hypot(x - choice1.pos.x, y - choice1.pos.y) < minDistFromChoices ||
+            Math.hypot(x - choice2.pos.x, y - choice2.pos.y) < minDistFromChoices;
+
+        const spawnGrassAt = (x, y) => {
+            const sprite = grassAnimSprites[Math.floor(Math.random() * grassAnimSprites.length)];
+            const startFrame = Math.floor(Math.random() * 8);
+            const g = k.add([
+                k.sprite(sprite, { frame: startFrame }),
+                k.pos(x, y),
+                k.anchor("center"),
+                k.scale(2.25 + Math.random() * 0.7),
+                k.opacity(0.76 + Math.random() * 0.18),
+                k.z(35),
+            ]);
+            g.play("sway");
+        };
+
+        const trySpawn = () => {
+            for (let attempt = 0; attempt < maxAttempts; attempt++) {
+                const x = 14 + Math.random() * Math.max(4, w - 28);
+                const y = 14 + Math.random() * Math.max(4, h - 28);
+                if (isOnPath(x, y)) continue;
+                if (isInClearing(x, y)) continue;
+                if (isNearChoice(x, y)) continue;
+                spawnGrassAt(x, y);
+                return;
+            }
+        };
+
+        for (let i = 0; i < totalGrass; i++) {
+            trySpawn();
+        }
+    }
 
     // ---- M4: NPC placeholder — to the right of clearing center, speech bubble above ----
     const npcSize = 192;
