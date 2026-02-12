@@ -3,7 +3,10 @@
  * M1: World bounds from viewport, placeholder background fill. Bounds enforced by clamp (no physics walls).
  * M2: Player — minimal: rect + arrow/WASD movement only (animations/sprites later).
  * M3: Path strip (placeholder colored rect) from spawn toward clearing; clearing = circle overlay at path end.
+ * M4: NPC + choice roses (placeholder red circles + labels), proximity prompt, one-time success.
  */
+
+import { setupChoiceInteraction } from "../systems/choiceController.js";
 
 /**
  * Get world width and height from viewport (responsive: phone smaller, desktop larger).
@@ -75,6 +78,45 @@ export default function gameScene(k) {
         k.color(160, 190, 130),
     ]);
 
+    // ---- M4: Two choice objects (red circles + labels), vertically stacked; player approaches from left ----
+    const choiceRadius = 26;
+    const rosesCenterX = clearingCenterX + 50;
+    const rose1Y = clearingCenterY - 70;
+    const rose2Y = clearingCenterY + 70;
+    const choice1 = k.add([
+        k.circle(choiceRadius),
+        k.pos(rosesCenterX, rose1Y),
+        k.color(200, 50, 50),
+        "choice",
+    ]);
+    k.add([
+        k.text("Yes", { size: 14 }),
+        k.pos(rosesCenterX, rose1Y),
+        k.anchor("center"),
+        k.color(255, 255, 255),
+    ]);
+    const choice2 = k.add([
+        k.circle(choiceRadius),
+        k.pos(rosesCenterX, rose2Y),
+        k.color(200, 50, 50),
+        "choice",
+    ]);
+    k.add([
+        k.text("You already said yes", { size: 12 }),
+        k.pos(rosesCenterX, rose2Y),
+        k.anchor("center"),
+        k.color(255, 255, 255),
+    ]);
+
+    // ---- M4: NPC placeholder (same size as player), to the right of the roses ----
+    const npcSize = 32;
+    k.add([
+        k.rect(npcSize, npcSize),
+        k.pos(rosesCenterX + choiceRadius * 2 + 28, clearingCenterY - npcSize / 2),
+        k.anchor("topleft"),
+        k.color(100, 90, 140),
+    ]);
+
     // ---- M2: Player — sprite if loaded, else rect; onKeyDown move; spawn at path start ----
     // const hasPlayerSprite = k.getSprite("player_sheet");
     const hasPlayerSprite = false;
@@ -107,5 +149,14 @@ export default function gameScene(k) {
     k.onUpdate(() => {
         player.pos.x = k.clamp(player.pos.x, 0, w - playerW);
         player.pos.y = k.clamp(player.pos.y, 0, h - playerH);
+    });
+
+    // ---- M4: Proximity prompt + one-time interact (choiceController) ----
+    const choiceSuccessBus = k.add([]);
+    setupChoiceInteraction(k, {
+        player,
+        choices: [choice1, choice2],
+        labels: ["Yes", "You already said yes"],
+        onSuccess: () => choiceSuccessBus.trigger("choiceSuccess"),
     });
 }

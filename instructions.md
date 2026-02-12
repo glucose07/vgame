@@ -155,7 +155,7 @@ assets/
 - M1: ✅ Done
 - M2: ✅ Done
 - M3: ✅ Done
-- M4: Not started
+- M4: ✅ Done
 - M5: Not started
 - M6: Not started
 
@@ -267,3 +267,4 @@ assets/
 - **M1:** World bounds from scene `width()`/`height()` (viewport). Placeholder background: base rect + grid of small circles. Invisible borders: four static body + area walls at edges (opacity 0). Player not modified; M2 will use borders for constraint.
 - **M2:** `src/systems/playerController.js` added: keyboard (arrows + WASD), normalized velocity via body.vel, facing (up/down/left/right), isMoving state. Placeholder: rect player + direction triangle (brighter when moving). Game scene spawns single player entity with body (gravityScale: 0), area, and controller; collides with M1 walls. Animation state machine in place for future sprite sheet (walk/idle); no assets used.
 - **M3:** Placeholder Mode A only. Path = full-width horizontal strip (tan/sand rect, 72px tall) from left to right; clearing = single circle at path end (right side, radius 85px, lighter green). Player spawns at path start (left). No path/clearing assets; no interaction or NPC (M4).
+- **M4:** NPC = purple rect in clearing. Two choice objects = red circles with white text ("Yes", "You already said yes") in clearing. Interaction in `src/systems/choiceController.js`: proximity radius 80px, "Press E" prompt above player when close; on E triggers success callback once then locks. Success fires `choiceSuccessBus.trigger("choiceSuccess")` for future M5/M6. Placeholder Mode A only; no rose PNGs.
