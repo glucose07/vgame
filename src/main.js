@@ -1,24 +1,15 @@
 import kaplay from "kaplay";
-// import "kaplay/global"; // uncomment if you want to use without the k. prefix
+import bootScene from "./scenes/boot.js";
+import gameScene from "./scenes/game.js";
 
-// Start with options
 const k = kaplay({
     background: "#71BB47",
-    scale: 2,
-    canvas: document.getElementById("canvas"),
+    scale: 1.25,
 });
 
-k.loadRoot("./"); // A good idea for Itch.io publishing later
+k.loadRoot("./");
 
-const player = k.add([
-    k.rect(32, 32), // Draw this object as a rectangle
-    k.pos(10, 20), // Position this object in X: 10 and Y: 20
-    "shape", // Classify this object as "shape"
-]);
+k.scene("boot", (...args) => bootScene(k, ...args));
+k.scene("game", (...args) => gameScene(k, ...args));
 
-k.onKeyDown("right", () => {
-    player.move(100, 0); // Move the object while "right" key is held down [!code highlight]
-});
-
-const isShape = player.is("shape"); // Check for tags [!code highlight]
-debug.log(isShape); // Log it on the screen
+k.go("boot");
