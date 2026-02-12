@@ -82,6 +82,8 @@ export default function gameScene(k) {
 
     // ---- M4: Two choice objects (red circles + labels), vertically stacked ----
     // Roses sit to the LEFT of the NPC so the speech bubble above NPC has clear space
+    // Font boost: compensate for low Kaplay scale on narrow/mobile screens
+    const fontBoost = Math.max(1, 600 / window.innerWidth);
     const choiceRadius = 26;
     const rosesCenterX = clearingCenterX - 30;
     const rose1Y = clearingCenterY - 60;
@@ -93,7 +95,7 @@ export default function gameScene(k) {
         "choice",
     ]);
     const choiceLabel1 = k.add([
-        k.text("Yes", { size: 14, font: "Nunito" }),
+        k.text("Yes", { size: Math.round(14 * fontBoost), font: "Nunito" }),
         k.pos(rosesCenterX, rose1Y),
         k.anchor("center"),
         k.color(255, 255, 255),
@@ -106,7 +108,7 @@ export default function gameScene(k) {
         "choice",
     ]);
     const choiceLabel2 = k.add([
-        k.text("You already said yes", { size: 12, font: "Nunito" }),
+        k.text("You already said yes", { size: Math.round(12 * fontBoost), font: "Nunito" }),
         k.pos(rosesCenterX, rose2Y),
         k.anchor("center"),
         k.color(255, 255, 255),
