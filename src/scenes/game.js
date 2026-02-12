@@ -7,6 +7,7 @@
  */
 
 import { setupChoiceInteraction } from "../systems/choiceController.js";
+import { setupPetalEffects } from "../systems/effects.js";
 
 /**
  * Get world width and height from viewport (responsive: phone smaller, desktop larger).
@@ -68,14 +69,14 @@ export default function gameScene(k) {
         k.rect(pathStripLength, pathStripHeight),
         k.pos(0, pathStripY),
         k.anchor("topleft"),
-        k.color(180, 155, 110),
+        k.color(110, 155, 85),
     ]);
 
     // ---- M3: Clearing circle at end of path ----
     k.add([
         k.circle(clearingRadius),
         k.pos(clearingCenterX, clearingCenterY),
-        k.color(160, 190, 130),
+        k.color(110, 155, 85),
     ]);
 
     // ---- M4: Two choice objects (red circles + labels), vertically stacked; player approaches from left ----
@@ -158,5 +159,13 @@ export default function gameScene(k) {
         choices: [choice1, choice2],
         labels: ["Yes", "You already said yes"],
         onSuccess: () => choiceSuccessBus.trigger("choiceSuccess"),
+    });
+
+    // ---- M5: Petal effects (ambient + burst on success) ----
+    setupPetalEffects(k, {
+        clearingCenter: { x: clearingCenterX, y: clearingCenterY },
+        worldW: w,
+        worldH: h,
+        successBus: choiceSuccessBus,
     });
 }

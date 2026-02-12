@@ -156,7 +156,7 @@ assets/
 - M2: ✅ Done
 - M3: ✅ Done
 - M4: ✅ Done
-- M5: Not started
+- M5: ✅ Done
 - M6: Not started
 
 ---
@@ -268,3 +268,4 @@ assets/
 - **M2:** `src/systems/playerController.js` added: keyboard (arrows + WASD), normalized velocity via body.vel, facing (up/down/left/right), isMoving state. Placeholder: rect player + direction triangle (brighter when moving). Game scene spawns single player entity with body (gravityScale: 0), area, and controller; collides with M1 walls. Animation state machine in place for future sprite sheet (walk/idle); no assets used.
 - **M3:** Placeholder Mode A only. Path = full-width horizontal strip (tan/sand rect, 72px tall) from left to right; clearing = single circle at path end (right side, radius 85px, lighter green). Player spawns at path start (left). No path/clearing assets; no interaction or NPC (M4).
 - **M4:** NPC = purple rect in clearing. Two choice objects = red circles with white text ("Yes", "You already said yes") in clearing. Interaction in `src/systems/choiceController.js`: proximity radius 80px, "Press E" prompt above player when close; on E triggers success callback once then locks. Success fires `choiceSuccessBus.trigger("choiceSuccess")` for future M5/M6. Placeholder Mode A only; no rose PNGs.
+- **M5:** Effects in `src/systems/effects.js`. Ambient petals: up to 18 small pink/red circles drift down over clearing with sinusoidal sway, recycled when past clearing bottom. Burst petals: 40 particles explode radially from clearing center on `choiceSuccess` event, fade over 2s, self-cleanup (update loop cancels when all gone). `setupPetalEffects()` called from `game.js`, subscribes to existing `choiceSuccessBus`. Placeholder Mode A only; no petal PNGs.
