@@ -21,10 +21,11 @@ export default function bootScene(k) {
                 "idle-right":  { from: 8, to: 8 },
                 "idle-left":   { from: 8, to: 8 },
                 "idle-up":     { from: 16, to: 16 },
-                "walk-down":   { from: 0, to: 5, speed: 8, loop: true },
-                "walk-right":  { from: 8, to: 13, speed: 8, loop: true },
-                "walk-left":   { from: 8, to: 13, speed: 8, loop: true },
-                "walk-up":     { from: 16, to: 21, speed: 8, loop: true },
+                // Use dedicated movement rows for fuller walk cycles.
+                "walk-down":   { from: 24, to: 29, speed: 14, loop: true },
+                "walk-right":  { from: 32, to: 37, speed: 14, loop: true },
+                "walk-left":   { from: 32, to: 37, speed: 14, loop: true },
+                "walk-up":     { from: 40, to: 45, speed: 14, loop: true },
             },
         }],
         ["npc_sheet", "assets/characters/npc_sheet.png", {
