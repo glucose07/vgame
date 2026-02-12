@@ -148,11 +148,88 @@ export default function gameScene(k) {
     const pathStripY = h / 2 - pathStripHeight / 2;
     const pathIntoClearing = clearingRadius * 0.3;
     const pathStripLength = clearingCenterX - clearingRadius + pathIntoClearing;
+    const pathTileSize = 16;
+    const hasPathTile = !!k.getSprite("path_middle_tile");
+    const hasCobbleRoadTiles = !!k.getSprite("cobble_road_tiles");
+    const pathCols = Math.ceil(pathStripLength / pathTileSize);
+    const pathRows = Math.ceil(pathStripHeight / pathTileSize);
+    const renderedPathLength = hasPathTile ? pathCols * pathTileSize : pathStripLength;
+    const renderedPathHeight = hasPathTile ? pathRows * pathTileSize : pathStripHeight;
+    const cobbleOverlayChance = 0.24;
+    const cobbleFrames = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+    if (hasPathTile) {
+        for (let col = 0; col < pathCols; col++) {
+            for (let row = 0; row < pathRows; row++) {
+                const tileX = col * pathTileSize;
+                const tileY = pathStripY + row * pathTileSize;
+                k.add([
+                    k.sprite("path_middle_tile"),
+                    k.pos(tileX, tileY),
+                    k.anchor("topleft"),
+                ]);
+                if (hasCobbleRoadTiles && Math.random() < cobbleOverlayChance) {
+                    const frame = cobbleFrames[Math.floor(Math.random() * cobbleFrames.length)];
+                    k.add([
+                        k.sprite("cobble_road_tiles", { frame }),
+                        k.pos(tileX, tileY),
+                        k.anchor("topleft"),
+                    ]);
+                }
+            }
+        }
+    } else {
+        k.add([
+            k.rect(renderedPathLength, renderedPathHeight),
+            k.pos(0, pathStripY),
+            k.anchor("topleft"),
+            k.color(110, 155, 85),
+        ]);
+    }
+    // Layered top/bottom bands create a soft shadow exactly on path edges.
+    const pathShadowColor = [72, 48, 30];
+    const pathTopY = pathStripY;
+    const pathBottomY = pathStripY + renderedPathHeight;
     k.add([
-        k.rect(pathStripLength, pathStripHeight),
-        k.pos(0, pathStripY),
+        k.rect(renderedPathLength, 4),
+        k.pos(0, pathTopY - 4),
         k.anchor("topleft"),
-        k.color(110, 155, 85),
+        k.color(...pathShadowColor),
+        k.opacity(0.1),
+    ]);
+    k.add([
+        k.rect(renderedPathLength, 2),
+        k.pos(0, pathTopY),
+        k.anchor("topleft"),
+        k.color(...pathShadowColor),
+        k.opacity(0.2),
+    ]);
+    k.add([
+        k.rect(renderedPathLength, 2),
+        k.pos(0, pathTopY + 2),
+        k.anchor("topleft"),
+        k.color(...pathShadowColor),
+        k.opacity(0.09),
+    ]);
+    k.add([
+        k.rect(renderedPathLength, 4),
+        k.pos(0, pathBottomY),
+        k.anchor("topleft"),
+        k.color(...pathShadowColor),
+        k.opacity(0.1),
+    ]);
+    k.add([
+        k.rect(renderedPathLength, 2),
+        k.pos(0, pathBottomY - 2),
+        k.anchor("topleft"),
+        k.color(...pathShadowColor),
+        k.opacity(0.2),
+    ]);
+    k.add([
+        k.rect(renderedPathLength, 2),
+        k.pos(0, pathBottomY - 4),
+        k.anchor("topleft"),
+        k.color(...pathShadowColor),
+        k.opacity(0.09),
     ]);
 
     // ---- M3: Clearing circle at end of path ----
@@ -316,18 +393,26 @@ export default function gameScene(k) {
         });
     }
 
-    // ---- M4: Two choice objects (red circles + labels), vertically stacked ----
+    // ---- M4: Two choice objects (flowers), vertically stacked ----
     // Roses sit to the LEFT of the NPC so the speech bubble above NPC has clear space
     const choiceRadius = 26;
+    const choiceFlowerScale = 4;
     const rosesCenterX = clearingCenterX - 30;
     const rose1Y = clearingCenterY - 60;
     const rose2Y = clearingCenterY + 60;
+    const hasFlowersAnimSheet = !!k.getSprite("flowers_anim_sheet");
+    const hasFlowersSheet = !!k.getSprite("flowers_sheet");
+    const flowerChoiceSprite = hasFlowersAnimSheet ? "flowers_anim_sheet" : "flowers_sheet";
+    const hasFlowerChoiceSprite = hasFlowersAnimSheet || hasFlowersSheet;
     const choice1 = k.add([
-        k.circle(choiceRadius),
+        hasFlowerChoiceSprite
+            ? k.sprite(flowerChoiceSprite, { frame: hasFlowersAnimSheet ? 0 : 0 })
+            : k.circle(choiceRadius),
         k.pos(rosesCenterX, rose1Y),
-        k.color(200, 50, 50),
+        ...(hasFlowerChoiceSprite ? [k.anchor("center"), k.scale(choiceFlowerScale)] : [k.color(200, 50, 50)]),
         "choice",
     ]);
+    if (hasFlowersAnimSheet) choice1.play("sway-row-1");
     const choiceLabel1 = k.add([
         k.text("Yes", { size: 14, font: "Nunito" }),
         k.pos(rosesCenterX, rose1Y),
@@ -336,11 +421,14 @@ export default function gameScene(k) {
         k.opacity(0),
     ]);
     const choice2 = k.add([
-        k.circle(choiceRadius),
+        hasFlowerChoiceSprite
+            ? k.sprite(flowerChoiceSprite, { frame: hasFlowersAnimSheet ? 24 : 4 })
+            : k.circle(choiceRadius),
         k.pos(rosesCenterX, rose2Y),
-        k.color(200, 50, 50),
+        ...(hasFlowerChoiceSprite ? [k.anchor("center"), k.scale(choiceFlowerScale)] : [k.color(200, 50, 50)]),
         "choice",
     ]);
+    if (hasFlowersAnimSheet) choice2.play("sway-row-5");
     const choiceLabel2 = k.add([
         k.text("You already said yes", { size: 12, font: "Nunito" }),
         k.pos(rosesCenterX, rose2Y),

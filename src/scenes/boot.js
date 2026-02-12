@@ -59,6 +59,26 @@ export default function bootScene(k) {
                 gust: { from: 0, to: 13, speed: 16, loop: true },
             },
         }],
+        ["path_middle_tile", "assets/tiles/Path_Middle.png"],
+        ["cobble_road_tiles", "assets/tiles/Cobble_Road.png", {
+            // 48x80 sheet: 3x5 frames (16x16 each)
+            sliceX: 3,
+            sliceY: 5,
+        }],
+        ["flowers_sheet", "assets/Outdoor decoration/Flowers.png", {
+            // 160x160 sheet: 10x10 frames (16x16 each)
+            sliceX: 10,
+            sliceY: 10,
+        }],
+        ["flowers_anim_sheet", "assets/Outdoor decoration/Outdoor_Decor_Animations/Flower_Animations/Flowers_1_Anim.png", {
+            // 96x160 sheet: 6x10 frames (16x16 each)
+            sliceX: 6,
+            sliceY: 10,
+            anims: {
+                "sway-row-1": { from: 0, to: 5, speed: 3, loop: true },
+                "sway-row-5": { from: 24, to: 29, speed: 3, loop: true },
+            },
+        }],
     ];
     const loadPromises = optionalAssets.map(([name, path, opt]) =>
         Promise.resolve(k.loadSprite(name, path, opt || {})).catch(() => {})
