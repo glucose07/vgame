@@ -16,7 +16,20 @@ export default function bootScene(k) {
         ["rose_field_tile", "assets/tiles/rose_field_tile.png"],
         ["unnamed_tile", "assets/tiles/unnamed_tile.png"],
         ["path_tile", "assets/tiles/path_tile.png"],
-        ["player_sheet", "assets/characters/player_sheet.png", { sliceX: 3, sliceY: 4 }],
+        ["player_sheet", "assets/characters/player_sheet.png", {
+            sliceX: 8,
+            sliceY: 14,
+            anims: {
+                "idle-down":   { from: 0, to: 0 },
+                "idle-right":  { from: 8, to: 8 },
+                "idle-left":   { from: 8, to: 8 },
+                "idle-up":     { from: 16, to: 16 },
+                "walk-down":   { from: 0, to: 5, speed: 8, loop: true },
+                "walk-right":  { from: 8, to: 13, speed: 8, loop: true },
+                "walk-left":   { from: 8, to: 13, speed: 8, loop: true },
+                "walk-up":     { from: 16, to: 21, speed: 8, loop: true },
+            },
+        }],
         ["npc_sheet", "assets/characters/npc_sheet.png", {
             sliceX: 8,
             sliceY: 14,

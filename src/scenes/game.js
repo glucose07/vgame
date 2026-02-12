@@ -130,13 +130,12 @@ export default function gameScene(k) {
     }
 
     // ---- M2: Player — sprite if loaded, else rect; onKeyDown move; spawn at path start ----
-    // const hasPlayerSprite = k.getSprite("player_sheet");
-    const hasPlayerSprite = false;
+    const hasPlayerSprite = !!k.getSprite("player_sheet");
     const player = k.add([
-        hasPlayerSprite ? k.sprite("player_sheet") : k.rect(64, 64),
+        hasPlayerSprite ? k.sprite("player_sheet", { frame: 0 }) : k.rect(64, 64),
         k.pos(40, h / 2 - 32),
         k.area(),
-        ...(hasPlayerSprite ? [k.scale(2)] : [k.color(200, 80, 80)]),
+        ...(hasPlayerSprite ? [] : [k.color(200, 80, 80)]),
         "player",
     ]);
 
@@ -160,25 +159,42 @@ export default function gameScene(k) {
     }
 
     // Keyboard movement — also cancels any active touch target
+    let playerDir = "right";
+    let playerMoving = false;
     const clearMoveTarget = () => { moveTarget = null; };
-    k.onKeyDown("left",  () => { clearMoveTarget(); player.move(-moveAmount, 0); });
-    k.onKeyDown("right", () => { clearMoveTarget(); player.move(moveAmount, 0); });
-    k.onKeyDown("up",    () => { clearMoveTarget(); player.move(0, -moveAmount); });
-    k.onKeyDown("down",  () => { clearMoveTarget(); player.move(0, moveAmount); });
-    k.onKeyDown("a",     () => { clearMoveTarget(); player.move(-moveAmount, 0); });
-    k.onKeyDown("d",     () => { clearMoveTarget(); player.move(moveAmount, 0); });
-    k.onKeyDown("w",     () => { clearMoveTarget(); player.move(0, -moveAmount); });
-    k.onKeyDown("s",     () => { clearMoveTarget(); player.move(0, moveAmount); });
+    const setDir = (dir) => { playerDir = dir; playerMoving = true; };
+    k.onKeyDown("left",  () => { clearMoveTarget(); setDir("left");  player.move(-moveAmount, 0); });
+    k.onKeyDown("right", () => { clearMoveTarget(); setDir("right"); player.move(moveAmount, 0); });
+    k.onKeyDown("up",    () => { clearMoveTarget(); setDir("up");    player.move(0, -moveAmount); });
+    k.onKeyDown("down",  () => { clearMoveTarget(); setDir("down");  player.move(0, moveAmount); });
+    k.onKeyDown("a",     () => { clearMoveTarget(); setDir("left");  player.move(-moveAmount, 0); });
+    k.onKeyDown("d",     () => { clearMoveTarget(); setDir("right"); player.move(moveAmount, 0); });
+    k.onKeyDown("w",     () => { clearMoveTarget(); setDir("up");    player.move(0, -moveAmount); });
+    k.onKeyDown("s",     () => { clearMoveTarget(); setDir("down");  player.move(0, moveAmount); });
 
     // Clamp to world bounds + click-to-move towards target
     const playerW = 64;
     const playerH = 64;
+    // Approximate center of the visible character body within the 64×64 sprite frame
+    const playerBodyOffsetX = 32;  // horizontally centered in frame
+    const playerBodyOffsetY = 40;  // character's feet are near the bottom, center is lower
     const arrivalThreshold = 8;  // stop moving when this close to target
     k.onUpdate(() => {
+        // ---- Animation switching ----
+        if (hasPlayerSprite) {
+            const isMoving = playerMoving || !!moveTarget;
+            const animName = isMoving ? `walk-${playerDir}` : `idle-${playerDir}`;
+            player.flipX = (playerDir === "left");
+            if (player.curAnim() !== animName) {
+                player.play(animName);
+            }
+            playerMoving = false;
+        }
+
         // Move toward click/touch target
         if (moveTarget) {
-            const cx = player.pos.x + playerW / 2;
-            const cy = player.pos.y + playerH / 2;
+            const cx = player.pos.x + playerBodyOffsetX;
+            const cy = player.pos.y + playerBodyOffsetY;
             const dx = moveTarget.x - cx;
             const dy = moveTarget.y - cy;
             const dist = Math.hypot(dx, dy);
@@ -186,6 +202,12 @@ export default function gameScene(k) {
                 moveTarget = null;
             } else {
                 player.move((dx / dist) * moveAmount, (dy / dist) * moveAmount);
+                // Infer direction from movement vector for touch-to-move
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    playerDir = dx > 0 ? "right" : "left";
+                } else {
+                    playerDir = dy > 0 ? "down" : "up";
+                }
             }
         }
         // Clamp to world bounds
@@ -193,10 +215,11 @@ export default function gameScene(k) {
         player.pos.y = k.clamp(player.pos.y, 0, h - playerH);
 
         // Push player out of rose circles (solid borders)
+        // Use a smaller collision radius for the player body (not the full sprite frame)
         const roses = [choice1, choice2];
-        const pcx = player.pos.x + playerW / 2;
-        const pcy = player.pos.y + playerH / 2;
-        const playerR = playerW / 2;
+        const pcx = player.pos.x + playerBodyOffsetX;
+        const pcy = player.pos.y + playerBodyOffsetY;
+        const playerR = 16;
         const collisionR = choiceRadius + playerR;
         for (const rose of roses) {
             const dx = pcx - rose.pos.x;
@@ -210,14 +233,19 @@ export default function gameScene(k) {
         }
 
         // Push player out of NPC rect (solid border)
-        const npcLeft = npc.pos.x;
-        const npcTop = npc.pos.y;
-        const npcRight = npcLeft + npcSize;
-        const npcBottom = npcTop + npcSize;
-        const pLeft = player.pos.x;
-        const pTop = player.pos.y;
-        const pRight = pLeft + playerW;
-        const pBottom = pTop + playerH;
+        // Use a smaller collision box centered within the visual sprite frame
+        const npcCollisionW = 45;
+        const npcCollisionH = 45;
+        const npcLeft = npc.pos.x + (npcSize - npcCollisionW) / 2;
+        const npcTop = npc.pos.y + (npcSize - npcCollisionH) / 2;
+        const npcRight = npcLeft + npcCollisionW;
+        const npcBottom = npcTop + npcCollisionH;
+        const playerBodyW = 24;
+        const playerBodyH = 32;
+        const pLeft = player.pos.x + playerBodyOffsetX - playerBodyW / 2;
+        const pTop = player.pos.y + playerBodyOffsetY - playerBodyH / 2;
+        const pRight = pLeft + playerBodyW;
+        const pBottom = pTop + playerBodyH;
         const overlapX = Math.min(pRight, npcRight) - Math.max(pLeft, npcLeft);
         const overlapY = Math.min(pBottom, npcBottom) - Math.max(pTop, npcTop);
         if (overlapX > 0 && overlapY > 0) {
@@ -234,6 +262,7 @@ export default function gameScene(k) {
     const choiceSuccessBus = k.add([]);
     const choiceController = setupChoiceInteraction(k, {
         player,
+        playerBodyOffset: { x: playerBodyOffsetX, y: playerBodyOffsetY },
         choices: [choice1, choice2],
         labels: ["Yes", "You already said yes"],
         choiceLabels: [choiceLabel1, choiceLabel2],
@@ -254,6 +283,7 @@ export default function gameScene(k) {
         clearingRadius,
         npcCenter: { x: npcX + npcSize / 2, y: npcY },
         player,
+        playerBodyOffset: { x: playerBodyOffsetX, y: playerBodyOffsetY },
         choiceLabels: [choiceLabel1, choiceLabel2],
         worldW: w,
         worldH: h,

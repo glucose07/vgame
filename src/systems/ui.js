@@ -45,6 +45,7 @@ function startTypewriter(k, textEntity, fullText, onDone) {
  */
 export function setupUI(k, opts) {
     const { clearingCenter, clearingRadius, npcCenter, player, choiceLabels, worldW, worldH, successBus } = opts;
+    const bodyOff = opts.playerBodyOffset || { x: 32, y: 40 };
 
     // ---- Responsive sizing ----
     const fontSize = Math.round(Math.max(10, Math.min(worldW * 0.024, 16)));
@@ -170,8 +171,8 @@ export function setupUI(k, opts) {
             return;
         }
 
-        const dx = player.pos.x - clearingCenter.x;
-        const dy = player.pos.y - clearingCenter.y;
+        const dx = (player.pos.x + bodyOff.x) - clearingCenter.x;
+        const dy = (player.pos.y + bodyOff.y) - clearingCenter.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         const inRange = dist <= BUBBLE_PROXIMITY;
 
@@ -196,8 +197,8 @@ export function setupUI(k, opts) {
 
         // Typewriter swap when player is right next to the NPC
         if (state === "waiting" || state === "done") {
-            const npcDx = (player.pos.x + 16) - npcCenter.x;
-            const npcDy = (player.pos.y + 16) - npcCenter.y;
+            const npcDx = (player.pos.x + bodyOff.x) - npcCenter.x;
+            const npcDy = (player.pos.y + bodyOff.y) - npcCenter.y;
             const npcDist = Math.sqrt(npcDx * npcDx + npcDy * npcDy);
             const isClose = npcDist <= KISS_PROXIMITY;
             if (isClose && !tooClose) {

@@ -22,6 +22,7 @@ const DEFAULT_TAP_RADIUS = 60; // how close a tap must be to a choice center to 
  */
 export function setupChoiceInteraction(k, opts) {
     const player = opts.player;
+    const bodyOff = opts.playerBodyOffset || { x: 32, y: 40 };
     const choices = opts.choices;
     const choiceLabels = opts.choiceLabels || [];
     const labels = opts.labels;
@@ -44,15 +45,19 @@ export function setupChoiceInteraction(k, opts) {
         "choicePrompt",
     ]);
 
-    function dist(a, b) {
-        return Math.hypot(a.pos.x - b.pos.x, a.pos.y - b.pos.y);
+    /** Distance from player body center to an entity's pos. */
+    function playerDistTo(entity) {
+        return Math.hypot(
+            (player.pos.x + bodyOff.x) - entity.pos.x,
+            (player.pos.y + bodyOff.y) - entity.pos.y,
+        );
     }
 
     function getMinDistanceToChoices() {
         if (!choices.length) return Infinity;
         let min = Infinity;
         for (const choice of choices) {
-            const d = dist(player, choice);
+            const d = playerDistTo(choice);
             if (d < min) min = d;
         }
         return min;
@@ -64,7 +69,7 @@ export function setupChoiceInteraction(k, opts) {
         let minD = Infinity;
         let idx = -1;
         for (let i = 0; i < choices.length; i++) {
-            const d = dist(player, choices[i]);
+            const d = playerDistTo(choices[i]);
             if (d < minD && d <= proximityRadius) {
                 minD = d;
                 idx = i;
@@ -103,8 +108,8 @@ export function setupChoiceInteraction(k, opts) {
         const d = getMinDistanceToChoices();
         if (d <= proximityRadius) {
             prompt.opacity = 1;
-            prompt.pos.x = player.pos.x + 16;   // center of 32px-wide player
-            prompt.pos.y = player.pos.y + 32 + 12; // below the player with a small gap
+            prompt.pos.x = player.pos.x + bodyOff.x;
+            prompt.pos.y = player.pos.y + bodyOff.y + 30; // below the player body with a small gap
         } else {
             prompt.opacity = 0;
         }
