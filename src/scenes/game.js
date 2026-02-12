@@ -55,6 +55,88 @@ export default function gameScene(k) {
         }
     }
 
+    // ---- Ambient butterflies (rows 1, 4, 5 from Butterfly.png: blue/pink/red) ----
+    const hasButterflySprite = !!k.getSprite("butterfly_sheet");
+    if (hasButterflySprite) {
+        const butterflyAnims = ["fly-blue", "fly-pink", "fly-red"];
+        const butterflyCount = 4 + Math.floor(Math.random() * 3); // 4-6
+        const butterflies = [];
+
+        for (let i = 0; i < butterflyCount; i++) {
+            const anim = butterflyAnims[Math.floor(Math.random() * butterflyAnims.length)];
+            const startSpeed = 34 + Math.random() * 44;
+            const startAngle = Math.random() * Math.PI * 2;
+            const vx = Math.cos(startAngle) * startSpeed;
+            const vy = Math.sin(startAngle) * startSpeed;
+
+            const butterfly = k.add([
+                k.sprite("butterfly_sheet", { frame: 0 }),
+                k.pos(
+                    20 + Math.random() * Math.max(20, w - 40),
+                    20 + Math.random() * Math.max(20, h - 40),
+                ),
+                k.anchor("center"),
+                k.scale(2.6),
+                k.opacity(0.9),
+                k.z(80),
+                "butterfly",
+            ]);
+            butterfly.play(anim);
+            butterfly.flipX = vx < 0;
+
+            butterflies.push({
+                obj: butterfly,
+                vx,
+                vy,
+                turnTimer: 0.25 + Math.random() * 0.9,
+                speedMin: 28,
+                speedMax: 92,
+            });
+        }
+
+        k.onUpdate(() => {
+            const butterflyHalfSize = (8 * 2.6) / 2;
+            const edgePad = butterflyHalfSize + 2;
+            for (const b of butterflies) {
+                b.turnTimer -= k.dt();
+                if (b.turnTimer <= 0) {
+                    // Periodically nudge heading and speed to keep paths organically random.
+                    b.vx += (Math.random() * 2 - 1) * 56;
+                    b.vy += (Math.random() * 2 - 1) * 56;
+                    const speed = Math.hypot(b.vx, b.vy) || 1;
+                    const targetSpeed = b.speedMin + Math.random() * (b.speedMax - b.speedMin);
+                    b.vx = (b.vx / speed) * targetSpeed;
+                    b.vy = (b.vy / speed) * targetSpeed;
+                    b.turnTimer = 0.18 + Math.random() * 0.85;
+                }
+
+                b.obj.pos.x += b.vx * k.dt();
+                b.obj.pos.y += b.vy * k.dt();
+                b.obj.flipX = b.vx < 0;
+
+                // Bounce off screen edges with a bit of randomness.
+                if (b.obj.pos.x < edgePad) {
+                    b.obj.pos.x = edgePad;
+                    b.vx = Math.abs(b.vx) * (0.9 + Math.random() * 0.2);
+                } else if (b.obj.pos.x > w - edgePad) {
+                    b.obj.pos.x = w - edgePad;
+                    b.vx = -Math.abs(b.vx) * (0.9 + Math.random() * 0.2);
+                }
+                if (b.obj.pos.y < edgePad) {
+                    b.obj.pos.y = edgePad;
+                    b.vy = Math.abs(b.vy) * (0.9 + Math.random() * 0.2);
+                } else if (b.obj.pos.y > h - edgePad) {
+                    b.obj.pos.y = h - edgePad;
+                    b.vy = -Math.abs(b.vy) * (0.9 + Math.random() * 0.2);
+                }
+
+                // Hard clamp as a final guard so butterflies always remain on-screen.
+                b.obj.pos.x = k.clamp(b.obj.pos.x, edgePad, w - edgePad);
+                b.obj.pos.y = k.clamp(b.obj.pos.y, edgePad, h - edgePad);
+            }
+        });
+    }
+
     // ---- M3: Clearing geometry (defined first so path can end at circle) ----
     const clearingPaddingFraction = 0.1;
     const clearingRadius = 225;
@@ -79,6 +161,160 @@ export default function gameScene(k) {
         k.pos(clearingCenterX, clearingCenterY),
         k.color(110, 155, 85),
     ]);
+
+    // ---- Ambient weather: drifting cloud shadows + occasional wind gust ----
+    const hasCloudsSprite = !!k.getSprite("clouds_sheet");
+    if (hasCloudsSprite) {
+        const cloudCount = 2 + Math.floor(Math.random() * 2); // 2-3
+        const clouds = [];
+        const cloudFrames = [0, 1, 2, 3];
+        const cloudSpacingX = Math.max(260, w * 0.34);
+        const cloudInitialGapX = Math.max(120, w * 0.26);
+        const firstVisibleX = w * (0.18 + Math.random() * 0.12);
+        let secondVisibleX = w * (0.58 + Math.random() * 0.18);
+        let cloudRegenTimer = 6 + Math.random() * 6;
+        if (Math.abs(secondVisibleX - firstVisibleX) < cloudInitialGapX) {
+            secondVisibleX = k.clamp(firstVisibleX + cloudInitialGapX, 24, w - 24);
+        }
+        // Shuffle so initial clouds prefer distinct variants.
+        for (let i = cloudFrames.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [cloudFrames[i], cloudFrames[j]] = [cloudFrames[j], cloudFrames[i]];
+        }
+
+        for (let i = 0; i < cloudCount; i++) {
+            const speed = 9 + Math.random() * 14;
+            let startX = -140 - i * cloudSpacingX - Math.random() * 80;
+            if (i === 0) startX = firstVisibleX;
+            if (i === 1) startX = secondVisibleX;
+            const y = 10 + Math.random() * Math.max(24, h * 0.72);
+            const frame = cloudFrames[i % cloudFrames.length];
+
+            const cloud = k.add([
+                k.sprite("clouds_sheet", { frame }),
+                k.pos(startX, y),
+                k.anchor("center"),
+                k.scale(2.9 + Math.random() * 0.35),
+                k.opacity(0.24 + Math.random() * 0.22),
+                "cloudShadow",
+            ]);
+
+            clouds.push({
+                obj: cloud,
+                vx: speed,
+                baseY: y,
+                age: Math.random() * 8,
+                bobAmp: 1.5 + Math.random() * 3,
+                bobFreq: 0.3 + Math.random() * 0.6,
+            });
+        }
+
+        k.onUpdate(() => {
+            let visibleClouds = 0;
+            for (const c of clouds) {
+                c.age += k.dt();
+                c.obj.pos.x += c.vx * k.dt();
+                c.obj.pos.y = c.baseY + Math.sin(c.age * c.bobFreq) * c.bobAmp;
+                if (c.obj.pos.x > -100 && c.obj.pos.x < w + 100) {
+                    visibleClouds++;
+                }
+
+                if (c.obj.pos.x > w + 140) {
+                    let leftMostX = Infinity;
+                    for (const other of clouds) {
+                        if (other === c) continue;
+                        if (other.obj.pos.x < leftMostX) leftMostX = other.obj.pos.x;
+                    }
+                    c.obj.pos.x = (leftMostX === Infinity)
+                        ? -140
+                        : leftMostX - cloudSpacingX - Math.random() * 80;
+                    c.baseY = 10 + Math.random() * Math.max(24, h * 0.72);
+                    c.obj.frame = Math.floor(Math.random() * 4);
+                }
+            }
+
+            // Periodic regeneration keeps cloud variants cycling over time.
+            cloudRegenTimer -= k.dt();
+            if (cloudRegenTimer <= 0) {
+                const c = clouds[Math.floor(Math.random() * clouds.length)];
+                c.obj.pos.x = -140 - Math.random() * 120;
+                c.baseY = 10 + Math.random() * Math.max(24, h * 0.72);
+                c.obj.frame = Math.floor(Math.random() * 4);
+                c.age = 0;
+                cloudRegenTimer = 6 + Math.random() * 8;
+            }
+
+            // Safety net: if all clouds are off-screen, force one back into view.
+            if (visibleClouds === 0 && clouds.length > 0) {
+                const c = clouds[Math.floor(Math.random() * clouds.length)];
+                c.obj.pos.x = 40 + Math.random() * Math.max(30, w - 80);
+                c.baseY = 10 + Math.random() * Math.max(24, h * 0.72);
+                c.obj.frame = Math.floor(Math.random() * 4);
+                c.age = Math.random() * 3;
+            }
+        });
+    }
+
+    const hasWindSprite = !!k.getSprite("wind_sheet");
+    if (hasWindSprite) {
+        let activeGust = null; // only one gust at a time
+        let nextGustIn = 1.8 + Math.random() * 3.2;
+
+        const spawnGust = () => {
+            const spawnPad = 22;
+            const x = spawnPad + Math.random() * Math.max(10, w - spawnPad * 2);
+            const y = spawnPad + Math.random() * Math.max(10, h - spawnPad * 2);
+            const speed = 110 + Math.random() * 120;
+            const angle = Math.random() * Math.PI * 2;
+            const vx = Math.cos(angle) * speed;
+            const vy = Math.sin(angle) * speed;
+            const gust = k.add([
+                k.sprite("wind_sheet", { frame: 0 }),
+                k.pos(x, y),
+                k.anchor("center"),
+                k.scale(2.6),
+                k.opacity(0.64),
+                "windGust",
+            ]);
+            gust.play("gust");
+            gust.flipX = vx < 0;
+            activeGust = {
+                obj: gust,
+                vx,
+                vy,
+                ttl: 1.1 + Math.random() * 1.2,
+            };
+        };
+
+        k.onUpdate(() => {
+            if (!activeGust) {
+                nextGustIn -= k.dt();
+                if (nextGustIn <= 0) {
+                    spawnGust();
+                }
+                return;
+            }
+
+            activeGust.ttl -= k.dt();
+            activeGust.obj.pos.x += activeGust.vx * k.dt();
+            activeGust.obj.pos.y += activeGust.vy * k.dt();
+            if (activeGust.ttl < 0.4) {
+                activeGust.obj.opacity = Math.max(0, activeGust.ttl / 0.4) * 0.64;
+            }
+
+            const despawnPad = 72;
+            const outOfBounds =
+                activeGust.obj.pos.x < -despawnPad ||
+                activeGust.obj.pos.x > w + despawnPad ||
+                activeGust.obj.pos.y < -despawnPad ||
+                activeGust.obj.pos.y > h + despawnPad;
+            if (activeGust.ttl <= 0 || outOfBounds) {
+                k.destroy(activeGust.obj);
+                activeGust = null;
+                nextGustIn = 2.4 + Math.random() * 4.6;
+            }
+        });
+    }
 
     // ---- M4: Two choice objects (red circles + labels), vertically stacked ----
     // Roses sit to the LEFT of the NPC so the speech bubble above NPC has clear space

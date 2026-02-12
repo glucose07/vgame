@@ -35,6 +35,30 @@ export default function bootScene(k) {
                 "idle-left": { from: 8, to: 9, speed: 2, loop: true },
             },
         }],
+        ["butterfly_sheet", "assets/animals/Butterfly.png", {
+            // 16x64 sheet: 2 columns x 8 rows (8x8 frames)
+            sliceX: 2,
+            sliceY: 8,
+            anims: {
+                // Requested rows only (1-based): 1 = blue, 4 = pink, 5 = red
+                "fly-blue": { from: 0, to: 1, speed: 10, loop: true },
+                "fly-pink": { from: 6, to: 7, speed: 10, loop: true },
+                "fly-red": { from: 8, to: 9, speed: 10, loop: true },
+            },
+        }],
+        ["clouds_sheet", "assets/weather/Clouds.png", {
+            // 128x128: 2x2 cloud variants (64x64 each)
+            sliceX: 2,
+            sliceY: 2,
+        }],
+        ["wind_sheet", "assets/weather/Wind_Anim.png", {
+            // 224x16: 14 frames (16x16 each)
+            sliceX: 14,
+            sliceY: 1,
+            anims: {
+                gust: { from: 0, to: 13, speed: 16, loop: true },
+            },
+        }],
     ];
     const loadPromises = optionalAssets.map(([name, path, opt]) =>
         Promise.resolve(k.loadSprite(name, path, opt || {})).catch(() => {})

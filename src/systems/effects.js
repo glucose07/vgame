@@ -24,6 +24,7 @@ const AMBIENT_MAX = 45;          // max concurrent ambient petals (whole field)
 const AMBIENT_SPAWN_INTERVAL = 0.18; // seconds between spawns
 const AMBIENT_FALL_SPEED_MIN = 18;
 const AMBIENT_FALL_SPEED_MAX = 45;
+const AMBIENT_INITIAL_FILL_RATIO = 0.7; // pre-seed petals so scene feels populated on load
 const AMBIENT_SWAY_AMP = 18;     // horizontal sway amplitude (px)
 const AMBIENT_SWAY_FREQ = 1.3;   // sway frequency (Hz)
 const AMBIENT_SIZE_MIN = 3;
@@ -41,10 +42,9 @@ export function startAmbientPetals(k, opts) {
     const petals = [];
     let timer = 0;
 
-    function spawnOne() {
+    function spawnOne(startY = -10 - Math.random() * 30, startAge = 0) {
         const size = AMBIENT_SIZE_MIN + Math.random() * (AMBIENT_SIZE_MAX - AMBIENT_SIZE_MIN);
         const startX = Math.random() * worldW;
-        const startY = -10 - Math.random() * 30;  // just above the top edge
         const fallSpeed = AMBIENT_FALL_SPEED_MIN + Math.random() * (AMBIENT_FALL_SPEED_MAX - AMBIENT_FALL_SPEED_MIN);
         const swayOffset = Math.random() * Math.PI * 2;
         const col = randomColor();
@@ -59,7 +59,15 @@ export function startAmbientPetals(k, opts) {
             "ambientPetal",
         ]);
 
-        petals.push({ obj: petal, fallSpeed, swayOffset, originX: startX, age: 0 });
+        petals.push({ obj: petal, fallSpeed, swayOffset, originX: startX, age: startAge });
+    }
+
+    // Seed a partial screen worth of petals on start so density ramps in immediately.
+    const initialCount = Math.floor(AMBIENT_MAX * AMBIENT_INITIAL_FILL_RATIO);
+    for (let i = 0; i < initialCount; i++) {
+        const seededY = -10 + Math.random() * (worldH + 20);
+        const seededAge = Math.random() * 6;
+        spawnOne(seededY, seededAge);
     }
 
     k.onUpdate(() => {
