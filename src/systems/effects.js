@@ -38,7 +38,13 @@ const AMBIENT_SIZE_MAX = 6;
  * @param {number} opts.worldH - World height
  */
 export function startAmbientPetals(k, opts) {
-    const { worldW, worldH } = opts;
+    const {
+        worldW,
+        worldH,
+        maxPetals = AMBIENT_MAX,
+        spawnInterval = AMBIENT_SPAWN_INTERVAL,
+        initialFillRatio = AMBIENT_INITIAL_FILL_RATIO,
+    } = opts;
     const petals = [];
     let timer = 0;
 
@@ -63,7 +69,7 @@ export function startAmbientPetals(k, opts) {
     }
 
     // Seed a partial screen worth of petals on start so density ramps in immediately.
-    const initialCount = Math.floor(AMBIENT_MAX * AMBIENT_INITIAL_FILL_RATIO);
+    const initialCount = Math.floor(maxPetals * initialFillRatio);
     for (let i = 0; i < initialCount; i++) {
         const seededY = -10 + Math.random() * (worldH + 20);
         const seededAge = Math.random() * 6;
@@ -71,21 +77,22 @@ export function startAmbientPetals(k, opts) {
     }
 
     k.onUpdate(() => {
-        timer += k.dt();
+        const dt = k.dt();
+        timer += dt;
 
         // Spawn new petals at interval (capped)
-        while (timer >= AMBIENT_SPAWN_INTERVAL && petals.length < AMBIENT_MAX) {
-            timer -= AMBIENT_SPAWN_INTERVAL;
+        while (timer >= spawnInterval && petals.length < maxPetals) {
+            timer -= spawnInterval;
             spawnOne();
         }
         // Prevent timer from accumulating if at cap
-        if (petals.length >= AMBIENT_MAX) timer = 0;
+        if (petals.length >= maxPetals) timer = 0;
 
         // Update existing petals
         for (let i = petals.length - 1; i >= 0; i--) {
             const p = petals[i];
-            p.age += k.dt();
-            p.obj.pos.y += p.fallSpeed * k.dt();
+            p.age += dt;
+            p.obj.pos.y += p.fallSpeed * dt;
             p.obj.pos.x = p.originX + Math.sin(p.age * AMBIENT_SWAY_FREQ + p.swayOffset) * AMBIENT_SWAY_AMP;
 
             // Remove when below world bottom
@@ -139,11 +146,12 @@ export function burstPetals(k, origin) {
     }
 
     const cancelBurst = k.onUpdate(() => {
+        const dt = k.dt();
         let alive = 0;
 
         for (let i = particles.length - 1; i >= 0; i--) {
             const p = particles[i];
-            p.age += k.dt();
+            p.age += dt;
 
             if (p.age >= BURST_LIFETIME) {
                 k.destroy(p.obj);
@@ -153,9 +161,9 @@ export function burstPetals(k, origin) {
 
             alive++;
             // Move
-            p.obj.pos.x += p.vx * k.dt();
-            p.obj.pos.y += p.vy * k.dt();
-            p.vy += BURST_GRAVITY * k.dt();
+            p.obj.pos.x += p.vx * dt;
+            p.obj.pos.y += p.vy * dt;
+            p.vy += BURST_GRAVITY * dt;
 
             // Slow down
             p.vx *= 0.995;
@@ -186,10 +194,10 @@ export function burstPetals(k, origin) {
  * @param {object} opts.successBus - Game object that fires "choiceSuccess"
  */
 export function setupPetalEffects(k, opts) {
-    const { clearingCenter, worldW, worldH, successBus } = opts;
+    const { clearingCenter, worldW, worldH, successBus, ambientConfig = {} } = opts;
 
     // Ambient petals — fall across the whole field
-    startAmbientPetals(k, { worldW, worldH });
+    startAmbientPetals(k, { worldW, worldH, ...ambientConfig });
 
     // Burst petals — fire once on success
     successBus.on("choiceSuccess", () => {

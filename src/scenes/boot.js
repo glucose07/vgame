@@ -61,6 +61,11 @@ export default function bootScene(k) {
             sliceX: 2,
             sliceY: 2,
         }],
+        ["big_oak_tree", "assets/trees/Big_Oak_Tree.png", {
+            // 96x48 sheet: 3x1 frames (32x48 each)
+            sliceX: 3,
+            sliceY: 1,
+        }],
         ["wind_sheet", "assets/weather/Wind_Anim.png", {
             // 224x16: 14 frames (16x16 each)
             sliceX: 14,
@@ -109,30 +114,6 @@ export default function bootScene(k) {
             sliceX: 6,
             sliceY: 10,
             anims: buildFlowerRowAnims(3),
-        }],
-        ["grass_anim_1", "assets/Outdoor decoration/Outdoor_Decor_Animations/Grass_Animations/Grass_1_Anim.png", {
-            // 128x16 sheet: 8x1 frames (16x16 each)
-            sliceX: 8,
-            sliceY: 1,
-            anims: {
-                sway: { from: 0, to: 7, speed: 4, loop: true },
-            },
-        }],
-        ["grass_anim_2", "assets/Outdoor decoration/Outdoor_Decor_Animations/Grass_Animations/Grass_2_Anim.png", {
-            // 128x16 sheet: 8x1 frames (16x16 each)
-            sliceX: 8,
-            sliceY: 1,
-            anims: {
-                sway: { from: 0, to: 7, speed: 4, loop: true },
-            },
-        }],
-        ["grass_anim_3", "assets/Outdoor decoration/Outdoor_Decor_Animations/Grass_Animations/Grass_3_Anim.png", {
-            // 128x16 sheet: 8x1 frames (16x16 each)
-            sliceX: 8,
-            sliceY: 1,
-            anims: {
-                sway: { from: 0, to: 7, speed: 4, loop: true },
-            },
         }],
     ];
     const loadPromises = optionalAssets.map(([name, path, opt]) =>

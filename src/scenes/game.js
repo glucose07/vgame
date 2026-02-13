@@ -24,109 +24,23 @@ function getWorldBounds(k) {
 export default function gameScene(k) {
     const { width: w, height: h } = getWorldBounds(k);
     const surroundingGrassColor = [62, 137, 72]; // #3e8948 for non-path/non-clearing ground
+    const isTouchDevice = ("ontouchstart" in globalThis) || (navigator.maxTouchPoints > 0);
+    const worldArea = w * h;
+    const lowPerfMode = isTouchDevice || worldArea > 1000000;
+    const textureDensityScale = lowPerfMode ? 0.72 : 0.9;
+    const flowerBudget = Math.max(280, Math.round(worldArea / (lowPerfMode ? 2400 : 2100)));
+    const secondFlowerChance = lowPerfMode ? 0.26 : 0.42;
+    const maxAnimatedFlowers = lowPerfMode ? 26 : 44;
 
     // ---- M1: Background — rose tile if loaded, else placeholder ----
-    const tileSize = 120;
-    if (k.getSprite("rose_field_tile") && false) {
-        for (let x = 0; x < w + tileSize; x += tileSize) {
-            for (let y = 0; y < h + tileSize; y += tileSize) {
-                k.add([
-                    k.sprite("rose_field_tile"),
-                    k.pos(x, y),
-                    k.anchor("topleft"),
-                ]);
-            }
-        }
-    } else {
-        k.add([
-            k.rect(w, h),
-            k.pos(0, 0),
-            k.anchor("topleft"),
-            k.color(...surroundingGrassColor),
-        ]);
-    }
+    k.add([
+        k.rect(w, h),
+        k.pos(0, 0),
+        k.anchor("topleft"),
+        k.color(...surroundingGrassColor),
+    ]);
 
-    // ---- Ambient butterflies (rows 1, 4, 5 from Butterfly.png: blue/pink/red) ----
-    const hasButterflySprite = !!k.getSprite("butterfly_sheet");
-    if (hasButterflySprite) {
-        const butterflyAnims = ["fly-blue", "fly-pink", "fly-red"];
-        const butterflyCount = 4 + Math.floor(Math.random() * 3); // 4-6
-        const butterflies = [];
-
-        for (let i = 0; i < butterflyCount; i++) {
-            const anim = butterflyAnims[Math.floor(Math.random() * butterflyAnims.length)];
-            const startSpeed = 34 + Math.random() * 44;
-            const startAngle = Math.random() * Math.PI * 2;
-            const vx = Math.cos(startAngle) * startSpeed;
-            const vy = Math.sin(startAngle) * startSpeed;
-
-            const butterfly = k.add([
-                k.sprite("butterfly_sheet", { frame: 0 }),
-                k.pos(
-                    20 + Math.random() * Math.max(20, w - 40),
-                    20 + Math.random() * Math.max(20, h - 40),
-                ),
-                k.anchor("center"),
-                k.scale(2.6),
-                k.opacity(0.9),
-                k.z(80),
-                "butterfly",
-            ]);
-            butterfly.play(anim);
-            butterfly.flipX = vx < 0;
-
-            butterflies.push({
-                obj: butterfly,
-                vx,
-                vy,
-                turnTimer: 0.25 + Math.random() * 0.9,
-                speedMin: 28,
-                speedMax: 92,
-            });
-        }
-
-        k.onUpdate(() => {
-            const butterflyHalfSize = (8 * 2.6) / 2;
-            const edgePad = butterflyHalfSize + 2;
-            for (const b of butterflies) {
-                b.turnTimer -= k.dt();
-                if (b.turnTimer <= 0) {
-                    // Periodically nudge heading and speed to keep paths organically random.
-                    b.vx += (Math.random() * 2 - 1) * 56;
-                    b.vy += (Math.random() * 2 - 1) * 56;
-                    const speed = Math.hypot(b.vx, b.vy) || 1;
-                    const targetSpeed = b.speedMin + Math.random() * (b.speedMax - b.speedMin);
-                    b.vx = (b.vx / speed) * targetSpeed;
-                    b.vy = (b.vy / speed) * targetSpeed;
-                    b.turnTimer = 0.18 + Math.random() * 0.85;
-                }
-
-                b.obj.pos.x += b.vx * k.dt();
-                b.obj.pos.y += b.vy * k.dt();
-                b.obj.flipX = b.vx < 0;
-
-                // Bounce off screen edges with a bit of randomness.
-                if (b.obj.pos.x < edgePad) {
-                    b.obj.pos.x = edgePad;
-                    b.vx = Math.abs(b.vx) * (0.9 + Math.random() * 0.2);
-                } else if (b.obj.pos.x > w - edgePad) {
-                    b.obj.pos.x = w - edgePad;
-                    b.vx = -Math.abs(b.vx) * (0.9 + Math.random() * 0.2);
-                }
-                if (b.obj.pos.y < edgePad) {
-                    b.obj.pos.y = edgePad;
-                    b.vy = Math.abs(b.vy) * (0.9 + Math.random() * 0.2);
-                } else if (b.obj.pos.y > h - edgePad) {
-                    b.obj.pos.y = h - edgePad;
-                    b.vy = -Math.abs(b.vy) * (0.9 + Math.random() * 0.2);
-                }
-
-                // Hard clamp as a final guard so butterflies always remain on-screen.
-                b.obj.pos.x = k.clamp(b.obj.pos.x, edgePad, w - edgePad);
-                b.obj.pos.y = k.clamp(b.obj.pos.y, edgePad, h - edgePad);
-            }
-        });
-    }
+    // ---- Ambient butterflies are added later after path/clearing geometry is defined ----
 
     // ---- M3: Clearing geometry (defined first so path can end at circle) ----
     const clearingPaddingFraction = 0.1;
@@ -222,22 +136,232 @@ export default function gameScene(k) {
         k.color(...pathShadowColor),
         k.opacity(0.09),
     ]);
+    // Mottled texture pass for path (same style as clearing, with earthy tones).
+    const pathTextureCount = Math.min(
+        lowPerfMode ? 26 : 34,
+        Math.max(14, Math.round(((renderedPathLength * renderedPathHeight) / 1900) * textureDensityScale)),
+    );
+    for (let i = 0; i < pathTextureCount; i++) {
+        const x = Math.random() * renderedPathLength;
+        const y = pathStripY + Math.random() * renderedPathHeight;
+        const darkPatch = Math.random() < 0.56;
+        k.add([
+            k.circle(3 + Math.random() * 7),
+            k.pos(x, y),
+            ...(darkPatch ? [k.color(98, 76, 50)] : [k.color(138, 114, 83)]),
+            k.opacity(darkPatch ? (0.045 + Math.random() * 0.055) : (0.03 + Math.random() * 0.045)),
+            k.z(2),
+        ]);
+    }
+    const pathSpeckleCount = Math.min(
+        lowPerfMode ? 36 : 52,
+        Math.max(20, Math.round(((renderedPathLength * renderedPathHeight) / 1100) * textureDensityScale)),
+    );
+    for (let i = 0; i < pathSpeckleCount; i++) {
+        const x = Math.random() * renderedPathLength;
+        const y = pathStripY + Math.random() * renderedPathHeight;
+        k.add([
+            k.circle(0.6 + Math.random() * 1.1),
+            k.pos(x, y),
+            k.color(84, 62, 41),
+            k.opacity(0.05 + Math.random() * 0.07),
+            k.z(2),
+        ]);
+    }
 
-    // ---- Flower field around path/clearing (dense, intermittent animation for performance) ----
-    const flowerFieldSheets = [
+    // ---- Ambient butterflies around path + clearing (soft bounds + natural return) ----
+    const hasButterflySprite = !!k.getSprite("butterfly_sheet");
+    if (hasButterflySprite) {
+        const butterflyAnims = ["fly-blue", "fly-pink", "fly-red"];
+        const butterflyCount = 3;
+        const butterflies = [];
+        const pathZoneTop = pathStripY;
+        const pathZoneBottom = pathStripY + renderedPathHeight;
+        const softMargin = 24;
+
+        const isInStrictZone = (x, y) => {
+            const inPath = x >= 0 && x <= renderedPathLength && y >= pathZoneTop && y <= pathZoneBottom;
+            const dx = x - clearingCenterX;
+            const dy = y - clearingCenterY;
+            const inClearing = (dx * dx + dy * dy) <= (clearingRadius * clearingRadius);
+            return inPath || inClearing;
+        };
+        const isInSoftZone = (x, y) => {
+            const inPath = x >= -softMargin
+                && x <= renderedPathLength + softMargin
+                && y >= pathZoneTop - softMargin
+                && y <= pathZoneBottom + softMargin;
+            const dx = x - clearingCenterX;
+            const dy = y - clearingCenterY;
+            const r = clearingRadius + softMargin;
+            const inClearing = (dx * dx + dy * dy) <= (r * r);
+            return inPath || inClearing;
+        };
+
+        const nearestStrictZonePoint = (x, y) => {
+            const pathX = k.clamp(x, 0, renderedPathLength);
+            const pathY = k.clamp(y, pathZoneTop, pathZoneBottom);
+            const pathDx = pathX - x;
+            const pathDy = pathY - y;
+            const pathD2 = pathDx * pathDx + pathDy * pathDy;
+
+            const clearDx = x - clearingCenterX;
+            const clearDy = y - clearingCenterY;
+            const clearDist = Math.hypot(clearDx, clearDy) || 1;
+            const clearX = clearDist <= clearingRadius
+                ? x
+                : clearingCenterX + (clearDx / clearDist) * clearingRadius;
+            const clearY = clearDist <= clearingRadius
+                ? y
+                : clearingCenterY + (clearDy / clearDist) * clearingRadius;
+            const cdx = clearX - x;
+            const cdy = clearY - y;
+            const clearD2 = cdx * cdx + cdy * cdy;
+
+            return pathD2 <= clearD2 ? { x: pathX, y: pathY } : { x: clearX, y: clearY };
+        };
+
+        const randomSpawnInZone = () => {
+            for (let i = 0; i < 120; i++) {
+                const x = 20 + Math.random() * Math.max(20, w - 40);
+                const y = 20 + Math.random() * Math.max(20, h - 40);
+                if (isInStrictZone(x, y)) return { x, y };
+            }
+            if (Math.random() < 0.55) {
+                return {
+                    x: Math.random() * renderedPathLength,
+                    y: pathZoneTop + Math.random() * Math.max(4, renderedPathHeight),
+                };
+            }
+            const angle = Math.random() * Math.PI * 2;
+            const dist = Math.sqrt(Math.random()) * clearingRadius * 0.95;
+            return {
+                x: clearingCenterX + Math.cos(angle) * dist,
+                y: clearingCenterY + Math.sin(angle) * dist,
+            };
+        };
+
+        for (let i = 0; i < butterflyCount; i++) {
+            const anim = butterflyAnims[Math.floor(Math.random() * butterflyAnims.length)];
+            const startSpeed = 34 + Math.random() * 44;
+            const startAngle = Math.random() * Math.PI * 2;
+            const spawn = randomSpawnInZone();
+            const vx = Math.cos(startAngle) * startSpeed;
+            const vy = Math.sin(startAngle) * startSpeed;
+
+            const butterfly = k.add([
+                k.sprite("butterfly_sheet", { frame: 0 }),
+                k.pos(spawn.x, spawn.y),
+                k.anchor("center"),
+                k.scale(2.6),
+                k.opacity(0.9),
+                k.z(80),
+                "butterfly",
+            ]);
+            butterfly.play(anim);
+            butterfly.flipX = vx < 0;
+
+            butterflies.push({
+                obj: butterfly,
+                vx,
+                vy,
+                turnTimer: 0.25 + Math.random() * 0.9,
+                speedMin: 28,
+                speedMax: 92,
+                curveDir: Math.random() < 0.5 ? -1 : 1,
+            });
+        }
+
+        k.onUpdate(() => {
+            const dt = k.dt();
+            const butterflyHalfSize = (8 * 2.6) / 2;
+            const edgePad = butterflyHalfSize + 2;
+            for (const b of butterflies) {
+                b.turnTimer -= dt;
+                if (b.turnTimer <= 0) {
+                    // Periodically nudge heading and speed to keep paths organically random.
+                    b.vx += (Math.random() * 2 - 1) * 56;
+                    b.vy += (Math.random() * 2 - 1) * 56;
+                    const speed = Math.hypot(b.vx, b.vy) || 1;
+                    const targetSpeed = b.speedMin + Math.random() * (b.speedMax - b.speedMin);
+                    b.vx = (b.vx / speed) * targetSpeed;
+                    b.vy = (b.vy / speed) * targetSpeed;
+                    b.turnTimer = 0.18 + Math.random() * 0.85;
+                }
+
+                b.obj.pos.x += b.vx * dt;
+                b.obj.pos.y += b.vy * dt;
+
+                const dxClear = b.obj.pos.x - clearingCenterX;
+                const dyClear = b.obj.pos.y - clearingCenterY;
+                const inClearing = (dxClear * dxClear + dyClear * dyClear) <= (clearingRadius * clearingRadius);
+                const inPathSoftBand = b.obj.pos.y >= pathZoneTop - softMargin
+                    && b.obj.pos.y <= pathZoneBottom + softMargin;
+                // Bounce near path extremes for a natural "flutter off and return" look.
+                if (!inClearing && inPathSoftBand) {
+                    if (b.obj.pos.y < pathZoneTop && b.vy < 0) b.vy = Math.abs(b.vy) * (0.9 + Math.random() * 0.16);
+                    if (b.obj.pos.y > pathZoneBottom && b.vy > 0) b.vy = -Math.abs(b.vy) * (0.9 + Math.random() * 0.16);
+                    if (b.obj.pos.x < 0 && b.vx < 0) b.vx = Math.abs(b.vx) * (0.9 + Math.random() * 0.16);
+                    // Let right side bleed slightly toward clearing, then return.
+                    const farFromClearing = Math.hypot(b.obj.pos.x - clearingCenterX, b.obj.pos.y - clearingCenterY) > clearingRadius + 22;
+                    if (b.obj.pos.x > renderedPathLength + softMargin * 0.4 && b.vx > 0 && farFromClearing) {
+                        b.vx = -Math.abs(b.vx) * (0.88 + Math.random() * 0.18);
+                    }
+                }
+
+                if (!isInStrictZone(b.obj.pos.x, b.obj.pos.y)) {
+                    const target = nearestStrictZonePoint(b.obj.pos.x, b.obj.pos.y);
+                    const toX = target.x - b.obj.pos.x;
+                    const toY = target.y - b.obj.pos.y;
+                    const toLen = Math.hypot(toX, toY) || 1;
+                    const speed = Math.hypot(b.vx, b.vy) || b.speedMin;
+                    const nx = toX / toLen;
+                    const ny = toY / toLen;
+                    // Add a tangent component so returns curve instead of snapping straight in.
+                    const tx = -ny * b.curveDir;
+                    const ty = nx * b.curveDir;
+                    const steerStrength = isInSoftZone(b.obj.pos.x, b.obj.pos.y) ? 0.11 : 0.28;
+                    const steerVx = (nx + tx * 0.42) * speed;
+                    const steerVy = (ny + ty * 0.42) * speed;
+                    b.vx += (steerVx - b.vx) * steerStrength;
+                    b.vy += (steerVy - b.vy) * steerStrength;
+                }
+
+                // Keep butterflies on-screen.
+                b.obj.pos.x = k.clamp(b.obj.pos.x, edgePad, w - edgePad);
+                b.obj.pos.y = k.clamp(b.obj.pos.y, edgePad, h - edgePad);
+                if (!isInSoftZone(b.obj.pos.x, b.obj.pos.y)) {
+                    const target = nearestStrictZonePoint(b.obj.pos.x, b.obj.pos.y);
+                    b.obj.pos.x = target.x;
+                    b.obj.pos.y = target.y;
+                }
+                b.obj.flipX = b.vx < 0;
+            }
+        });
+    }
+
+    // ---- Flower field around path/clearing (48x48 cells, max 2 flowers/cell) + zoned trees ----
+    const flowerStaticSheet = k.getSprite("flowers_sheet") ? "flowers_sheet" : null;
+    const flowerAnimSheets = [
         "flowers_anim_sheet",
         "flowers_anim_sheet_2",
         "flowers_anim_sheet_3",
         "flowers_anim_sheet_4",
         "flowers_anim_sheet_5",
     ].filter((name) => !!k.getSprite(name));
-    if (flowerFieldSheets.length > 0) {
-        const flowerEntries = [];
-        const targetFlowers = Math.max(90, Math.round((w * h) / 6000));
-        const maxAttempts = targetFlowers * 36;
+    const hasBigOakTreeSprite = !!k.getSprite("big_oak_tree");
+    const treeTrunkColliders = [];
+    if (flowerStaticSheet || flowerAnimSheets.length > 0 || hasBigOakTreeSprite) {
+        const animatedFlowerEntries = [];
+        const treeTrunks = [];
         const pathPad = 10;
         const clearingPad = 6;
         const edgePad = 12;
+        const gridSize = 48;
+        const maxFlowersPerCell = 2;
+        const animatedSpawnChance = flowerAnimSheets.length > 0
+            ? (lowPerfMode ? 0.12 : 0.2)
+            : 0;
 
         const isOnPath = (x, y) =>
             x >= -pathPad &&
@@ -251,20 +375,274 @@ export default function gameScene(k) {
             return (dx * dx + dy * dy) <= (r * r);
         };
 
-        for (let attempt = 0; attempt < maxAttempts && flowerEntries.length < targetFlowers; attempt++) {
+        // Still flowers: columns 1-4 and rows 1/3/5/7/9 (1-based), excluding row1 col1.
+        const staticRows = [0, 2, 4, 6, 8];
+        const staticCols = [0, 1, 2, 3];
+        const staticFrames = [];
+        for (const row of staticRows) {
+            for (const col of staticCols) {
+                if (row === 0 && col === 0) continue; // never use choice flower row1 col1
+                staticFrames.push(row * 10 + col);
+            }
+        }
+
+        // Animated flowers: first 4 rows (1-based), all columns, except top-row choice variants.
+        const animRows = [0, 1, 2, 3];
+        const pickAnimCol = (row) => {
+            if (row === 0) {
+                const allowedTopRowCols = [1, 2, 3, 5]; // skip col1 and col5 (1-based)
+                return allowedTopRowCols[Math.floor(Math.random() * allowedTopRowCols.length)];
+            }
+            return Math.floor(Math.random() * 6);
+        };
+
+        if (hasBigOakTreeSprite) {
+            const treeMinSpacing = 72;
+            const treeClearanceFromClearing = clearingRadius + 50;
+            const treeScaleBase = 2.0;
+            const treePathBuffer = 80;
+            const pathRectTop = pathStripY;
+            const pathRectBottom = pathStripY + renderedPathHeight;
+            const distToPathRect = (x, y) => {
+                const nx = k.clamp(x, 0, renderedPathLength);
+                const ny = k.clamp(y, pathRectTop, pathRectBottom);
+                return Math.hypot(x - nx, y - ny);
+            };
+
+            const canPlaceTreeAt = (x, y) => {
+                if (isOnPath(x, y)) return false;
+                if (distToPathRect(x, y) < treePathBuffer) return false;
+                if (isInClearing(x, y)) return false;
+                if (Math.hypot(x - clearingCenterX, y - clearingCenterY) < treeClearanceFromClearing) return false;
+                for (const t of treeTrunks) {
+                    if (Math.hypot(x - t.x, y - t.baseY) < treeMinSpacing) return false;
+                }
+                return true;
+            };
+
+            const placeTreeAt = (x, y) => {
+                const treeScale = treeScaleBase + (Math.random() * 0.26 - 0.13);
+                k.add([
+                    k.sprite("big_oak_tree", { frame: 1 }), // row 1, col 2
+                    k.pos(x, y),
+                    k.anchor("bot"),
+                    k.scale(treeScale),
+                    k.opacity(0.97),
+                    k.z(90),
+                ]);
+                const trunkW = 32 * treeScale;
+                const trunkH = 20 * treeScale;
+                treeTrunkColliders.push({
+                    left: x - trunkW / 2,
+                    right: x + trunkW / 2,
+                    top: y - trunkH,
+                    bottom: y,
+                });
+                treeTrunks.push({
+                    x,
+                    baseY: y,
+                    rootY: y - 4.2 * treeScale,
+                    rootRadiusX: 30 * treeScale,
+                    rootRadiusY: 22 * treeScale,
+                    stemHalfW: 8 * treeScale,
+                    stemTop: y - 20 * treeScale,
+                    stemBottom: y + 2 * treeScale,
+                });
+            };
+
+            const spawnTreesInZone = ({ minCount, maxCount, xMin, xMax, yMin, yMax }) => {
+                if (xMax <= xMin || yMax <= yMin) return;
+                const target = minCount + Math.floor(Math.random() * (maxCount - minCount + 1));
+                const zoneW = Math.max(1, xMax - xMin);
+                const zoneH = Math.max(1, yMax - yMin);
+                const aspect = zoneW / zoneH;
+                const slotCols = Math.max(1, Math.round(Math.sqrt(target * aspect)));
+                const slotRows = Math.max(1, Math.ceil(target / slotCols));
+                const slotW = zoneW / slotCols;
+                const slotH = zoneH / slotRows;
+                const slots = [];
+                for (let row = 0; row < slotRows; row++) {
+                    for (let col = 0; col < slotCols; col++) {
+                        slots.push({
+                            x0: xMin + col * slotW,
+                            x1: xMin + (col + 1) * slotW,
+                            y0: yMin + row * slotH,
+                            y1: yMin + (row + 1) * slotH,
+                        });
+                    }
+                }
+                for (let i = slots.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [slots[i], slots[j]] = [slots[j], slots[i]];
+                }
+
+                let placed = 0;
+                for (const slot of slots) {
+                    if (placed >= target) break;
+                    const padX = Math.min(10, (slot.x1 - slot.x0) * 0.2);
+                    const padY = Math.min(10, (slot.y1 - slot.y0) * 0.2);
+                    const sx0 = slot.x0 + padX;
+                    const sx1 = slot.x1 - padX;
+                    const sy0 = slot.y0 + padY;
+                    const sy1 = slot.y1 - padY;
+                    if (sx1 <= sx0 || sy1 <= sy0) continue;
+
+                    let placedInSlot = false;
+                    for (let attempt = 0; attempt < 10; attempt++) {
+                        const x = sx0 + Math.random() * (sx1 - sx0);
+                        const y = sy0 + Math.random() * (sy1 - sy0);
+                        if (!canPlaceTreeAt(x, y)) continue;
+                        placeTreeAt(x, y);
+                        placed++;
+                        placedInSlot = true;
+                        break;
+                    }
+                    if (placedInSlot) continue;
+                }
+
+                // Fallback random attempts when strict slot placement can't satisfy count.
+                const maxFallbackAttempts = target * 80;
+                for (let attempt = 0; attempt < maxFallbackAttempts && placed < target; attempt++) {
+                    const x = xMin + Math.random() * (xMax - xMin);
+                    const y = yMin + Math.random() * (yMax - yMin);
+                    if (!canPlaceTreeAt(x, y)) continue;
+                    placeTreeAt(x, y);
+                    placed++;
+                }
+            };
+
+            const treeMinY = 48 * (treeScaleBase + 0.13) + 4;
+            const treeZones = [
+                // Top of path: 2-3 trees
+                {
+                    minCount: 2,
+                    maxCount: 3,
+                    xMin: edgePad + 20,
+                    xMax: Math.max(edgePad + 70, renderedPathLength - 24),
+                    yMin: treeMinY,
+                    yMax: Math.max(treeMinY + 10, pathStripY - treePathBuffer),
+                },
+                // Behind clearing: 1-2 trees (right side, still outside clearing safety band)
+                {
+                    minCount: 1,
+                    maxCount: 2,
+                    xMin: Math.max(edgePad + 20, clearingCenterX + clearingRadius * 0.58),
+                    xMax: w - edgePad - 12,
+                    yMin: Math.max(treeMinY, clearingCenterY - clearingRadius * 0.9),
+                    yMax: Math.min(h - edgePad - 4, clearingCenterY + clearingRadius * 0.9),
+                },
+                // Bottom of path: 2-3 trees
+                {
+                    minCount: 2,
+                    maxCount: 3,
+                    xMin: edgePad + 20,
+                    xMax: Math.max(edgePad + 70, renderedPathLength - 24),
+                    yMin: Math.min(h - edgePad - 6, pathStripY + renderedPathHeight + treePathBuffer),
+                    yMax: h - edgePad - 6,
+                },
+            ];
+
+            for (const zone of treeZones) {
+                spawnTreesInZone(zone);
+            }
+        }
+
+        // Ground texture under flower field (outside path and clearing), tuned stronger for readability.
+        const fieldMacroPatchCount = Math.min(
+            lowPerfMode ? 22 : 30,
+            Math.max(16, Math.round((w * h) / (lowPerfMode ? 13000 : 10500))),
+        );
+        for (let i = 0; i < fieldMacroPatchCount; i++) {
             const x = edgePad + Math.random() * Math.max(8, w - edgePad * 2);
             const y = edgePad + Math.random() * Math.max(8, h - edgePad * 2);
             if (isOnPath(x, y)) continue;
             if (isInClearing(x, y)) continue;
+            const darkPatch = Math.random() < 0.62;
+            k.add([
+                k.circle(10 + Math.random() * 14),
+                k.pos(x, y),
+                ...(darkPatch ? [k.color(72, 118, 58)] : [k.color(112, 164, 88)]),
+                k.opacity(darkPatch ? (0.05 + Math.random() * 0.05) : (0.035 + Math.random() * 0.04)),
+                k.z(1),
+            ]);
+        }
+        const fieldTextureCount = Math.min(
+            lowPerfMode ? 120 : 170,
+            Math.max(lowPerfMode ? 72 : 90, Math.round((w * h) / (lowPerfMode ? 4200 : 3400))),
+        );
+        for (let i = 0; i < fieldTextureCount; i++) {
+            const x = edgePad + Math.random() * Math.max(8, w - edgePad * 2);
+            const y = edgePad + Math.random() * Math.max(8, h - edgePad * 2);
+            if (isOnPath(x, y)) continue;
+            if (isInClearing(x, y)) continue;
+            const darkPatch = Math.random() < 0.6;
+            k.add([
+                k.circle(4.8 + Math.random() * 10.5),
+                k.pos(x, y),
+                ...(darkPatch ? [k.color(78, 126, 62)] : [k.color(116, 169, 92)]),
+                k.opacity(darkPatch ? (0.09 + Math.random() * 0.09) : (0.065 + Math.random() * 0.075)),
+                k.z(1),
+            ]);
+        }
+        const fieldSpeckleCount = Math.min(
+            lowPerfMode ? 130 : 190,
+            Math.max(lowPerfMode ? 80 : 110, Math.round((w * h) / (lowPerfMode ? 3200 : 2600))),
+        );
+        for (let i = 0; i < fieldSpeckleCount; i++) {
+            const x = edgePad + Math.random() * Math.max(8, w - edgePad * 2);
+            const y = edgePad + Math.random() * Math.max(8, h - edgePad * 2);
+            if (isOnPath(x, y)) continue;
+            if (isInClearing(x, y)) continue;
+            k.add([
+                k.circle(0.9 + Math.random() * 1.6),
+                k.pos(x, y),
+                k.color(70, 111, 55),
+                k.opacity(0.11 + Math.random() * 0.1),
+                k.z(1),
+            ]);
+        }
 
-            const sheet = flowerFieldSheets[Math.floor(Math.random() * flowerFieldSheets.length)];
-            const row = Math.floor(Math.random() * 10);
-            const rowStart = row * 6;
-            const frame = rowStart + Math.floor(Math.random() * 6);
-            const anim = `sway-row-${row + 1}`;
+        const isNearTreeTrunk = (x, y) => {
+            for (const t of treeTrunks) {
+                const dx = (x - t.x) / t.rootRadiusX;
+                const dy = (y - t.rootY) / t.rootRadiusY;
+                if ((dx * dx + dy * dy) <= 1) return true;
+                if (
+                    x >= t.x - t.stemHalfW &&
+                    x <= t.x + t.stemHalfW &&
+                    y >= t.stemTop &&
+                    y <= t.stemBottom
+                ) return true;
+            }
+            return false;
+        };
+
+        const spawnFlowerAt = (x, y) => {
+            if (isNearTreeTrunk(x, y)) return false;
+            const useAnimated = flowerAnimSheets.length > 0
+                && animatedFlowerEntries.length < maxAnimatedFlowers
+                && (!flowerStaticSheet || Math.random() < animatedSpawnChance);
+
+            let spriteName = flowerStaticSheet;
+            let frame = 0;
+            let anim = null;
+            let animRow = -1;
+            let rowStart = 0;
+
+            if (useAnimated) {
+                const sheet = flowerAnimSheets[Math.floor(Math.random() * flowerAnimSheets.length)];
+                animRow = animRows[Math.floor(Math.random() * animRows.length)];
+                rowStart = animRow * 6;
+                frame = rowStart + pickAnimCol(animRow);
+                anim = `sway-row-${animRow + 1}`;
+                spriteName = sheet;
+            } else {
+                if (!flowerStaticSheet || staticFrames.length === 0) return false;
+                frame = staticFrames[Math.floor(Math.random() * staticFrames.length)];
+            }
 
             const flower = k.add([
-                k.sprite(sheet, { frame }),
+                k.sprite(spriteName, { frame }),
                 k.pos(x, y),
                 k.anchor("center"),
                 k.scale(2.0 + Math.random() * 1.4),
@@ -272,34 +650,84 @@ export default function gameScene(k) {
                 k.z(20),
             ]);
 
-            flowerEntries.push({
-                obj: flower,
-                anim,
-                rowStart,
-                burst: 0,
-                cooldown: 4 + Math.random() * 8,
-            });
-        }
+            if (anim) {
+                animatedFlowerEntries.push({
+                    obj: flower,
+                    anim,
+                    animRow,
+                    rowStart,
+                    burst: 0,
+                    cooldown: 4 + Math.random() * 8,
+                });
+            }
+            return true;
+        };
 
-        k.onUpdate(() => {
-            const dt = k.dt();
-            for (const f of flowerEntries) {
-                if (f.burst > 0) {
-                    f.burst -= dt;
-                    if (f.burst <= 0) {
-                        if (typeof f.obj.stop === "function") f.obj.stop();
-                        f.obj.frame = f.rowStart + Math.floor(Math.random() * 6);
-                        f.cooldown = 7 + Math.random() * 11;
+        if (flowerStaticSheet || flowerAnimSheets.length > 0) {
+            const cols = Math.ceil(w / gridSize);
+            const rows = Math.ceil(h / gridSize);
+            let placedFlowerCount = 0;
+            flowerGridLoop: for (let gy = 0; gy < rows; gy++) {
+                for (let gx = 0; gx < cols; gx++) {
+                    if (placedFlowerCount >= flowerBudget) break flowerGridLoop;
+                    const cellLeft = gx * gridSize;
+                    const cellTop = gy * gridSize;
+                    const margin = 3;
+                    const xMin = Math.max(edgePad, cellLeft + margin);
+                    const xMax = Math.min(w - edgePad, cellLeft + gridSize - margin);
+                    const yMin = Math.max(edgePad, cellTop + margin);
+                    const yMax = Math.min(h - edgePad, cellTop + gridSize - margin);
+                    if (xMax <= xMin || yMax <= yMin) continue;
+
+                    const remainingBudget = flowerBudget - placedFlowerCount;
+                    if (remainingBudget <= 0) break flowerGridLoop;
+                    const targetInCell = Math.min(
+                        maxFlowersPerCell,
+                        remainingBudget,
+                        1 + (Math.random() < secondFlowerChance ? 1 : 0),
+                    );
+                    let placedInCell = 0;
+                    for (let attempt = 0; attempt < 5 && placedInCell < targetInCell && placedInCell < maxFlowersPerCell; attempt++) {
+                        const x = xMin + Math.random() * (xMax - xMin);
+                        const y = yMin + Math.random() * (yMax - yMin);
+                        if (isOnPath(x, y)) continue;
+                        if (isInClearing(x, y)) continue;
+                        if (spawnFlowerAt(x, y)) {
+                            placedInCell++;
+                            placedFlowerCount++;
+                        }
                     }
-                    continue;
-                }
-                f.cooldown -= dt;
-                if (f.cooldown <= 0) {
-                    f.obj.play(f.anim);
-                    f.burst = 0.7 + Math.random() * 1.2;
                 }
             }
-        });
+        }
+
+        if (animatedFlowerEntries.length > 0) {
+            const animStride = animatedFlowerEntries.length >= 180
+                ? 6
+                : (animatedFlowerEntries.length >= 90 ? 4 : 3);
+            let animPhase = 0;
+            k.onUpdate(() => {
+                const dt = k.dt() * animStride;
+                for (let i = animPhase; i < animatedFlowerEntries.length; i += animStride) {
+                    const f = animatedFlowerEntries[i];
+                    if (f.burst > 0) {
+                        f.burst -= dt;
+                        if (f.burst <= 0) {
+                            if (typeof f.obj.stop === "function") f.obj.stop();
+                            f.obj.frame = f.rowStart + pickAnimCol(f.animRow);
+                            f.cooldown = 7 + Math.random() * 11;
+                        }
+                        continue;
+                    }
+                    f.cooldown -= dt;
+                    if (f.cooldown <= 0) {
+                        f.obj.play(f.anim);
+                        f.burst = 0.7 + Math.random() * 1.2;
+                    }
+                }
+                animPhase = (animPhase + 1) % animStride;
+            });
+        }
     }
 
     // ---- M3: Clearing circle at end of path ----
@@ -337,6 +765,43 @@ export default function gameScene(k) {
         k.color(118, 164, 90),
         k.opacity(0.12),
     ]);
+    // Mottled texture inside clearing so the ground reads less flat.
+    const clearingTextureRadius = Math.max(20, clearingRadius - clearingRimInset - 12);
+    const clearingTextureCount = Math.min(
+        lowPerfMode ? 54 : 72,
+        Math.max(40, Math.round((clearingTextureRadius * clearingTextureRadius) / (lowPerfMode ? 2300 : 1800))),
+    );
+    for (let i = 0; i < clearingTextureCount; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.sqrt(Math.random()) * clearingTextureRadius;
+        const x = clearingCenterX + Math.cos(angle) * dist;
+        const y = clearingCenterY + Math.sin(angle) * dist;
+        const darkPatch = Math.random() < 0.58;
+        k.add([
+            k.circle(4 + Math.random() * 10),
+            k.pos(x, y),
+            ...(darkPatch ? [k.color(95, 140, 76)] : [k.color(130, 174, 100)]),
+            k.opacity(darkPatch ? (0.08 + Math.random() * 0.08) : (0.05 + Math.random() * 0.06)),
+            k.z(1),
+        ]);
+    }
+    const clearingSpeckleCount = Math.min(
+        lowPerfMode ? 68 : 92,
+        Math.max(52, Math.round((clearingTextureRadius * clearingTextureRadius) / (lowPerfMode ? 1250 : 980))),
+    );
+    for (let i = 0; i < clearingSpeckleCount; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.sqrt(Math.random()) * clearingTextureRadius;
+        const x = clearingCenterX + Math.cos(angle) * dist;
+        const y = clearingCenterY + Math.sin(angle) * dist;
+        k.add([
+            k.circle(0.7 + Math.random() * 1.4),
+            k.pos(x, y),
+            k.color(82, 125, 66),
+            k.opacity(0.09 + Math.random() * 0.09),
+            k.z(1),
+        ]);
+    }
 
     // ---- Ambient weather: drifting cloud shadows + occasional wind gust ----
     const hasCloudsSprite = !!k.getSprite("clouds_sheet");
@@ -386,10 +851,11 @@ export default function gameScene(k) {
         }
 
         k.onUpdate(() => {
+            const dt = k.dt();
             let visibleClouds = 0;
             for (const c of clouds) {
-                c.age += k.dt();
-                c.obj.pos.x += c.vx * k.dt();
+                c.age += dt;
+                c.obj.pos.x += c.vx * dt;
                 c.obj.pos.y = c.baseY + Math.sin(c.age * c.bobFreq) * c.bobAmp;
                 if (c.obj.pos.x > -100 && c.obj.pos.x < w + 100) {
                     visibleClouds++;
@@ -410,7 +876,7 @@ export default function gameScene(k) {
             }
 
             // Periodic regeneration keeps cloud variants cycling over time.
-            cloudRegenTimer -= k.dt();
+            cloudRegenTimer -= dt;
             if (cloudRegenTimer <= 0) {
                 const c = clouds[Math.floor(Math.random() * clouds.length)];
                 c.obj.pos.x = -140 - Math.random() * 120;
@@ -463,17 +929,18 @@ export default function gameScene(k) {
         };
 
         k.onUpdate(() => {
+            const dt = k.dt();
             if (!activeGust) {
-                nextGustIn -= k.dt();
+                nextGustIn -= dt;
                 if (nextGustIn <= 0) {
                     spawnGust();
                 }
                 return;
             }
 
-            activeGust.ttl -= k.dt();
-            activeGust.obj.pos.x += activeGust.vx * k.dt();
-            activeGust.obj.pos.y += activeGust.vy * k.dt();
+            activeGust.ttl -= dt;
+            activeGust.obj.pos.x += activeGust.vx * dt;
+            activeGust.obj.pos.y += activeGust.vy * dt;
             if (activeGust.ttl < 0.4) {
                 activeGust.obj.opacity = Math.max(0, activeGust.ttl / 0.4) * 0.64;
             }
@@ -544,62 +1011,7 @@ export default function gameScene(k) {
         k.opacity(0),
         k.z(119),
     ]);
-    // ---- Sparse animated grass across grassy zones, excluding path + clearing ----
-    const grassAnimSprites = ["grass_anim_1", "grass_anim_2", "grass_anim_3"]
-        .filter((name) => !!k.getSprite(name));
-    if (grassAnimSprites.length > 0) {
-        const pathPad = 8;
-        const clearingNoGrassPad = 8;
-        const minDistFromChoices = 38;
-        const totalGrass = Math.max(8, Math.min(20, Math.round((w * h) / 70000)));
-        const maxAttempts = 900;
-
-        const isOnPath = (x, y) =>
-            x >= -pathPad &&
-            x <= renderedPathLength + pathPad &&
-            y >= pathStripY - pathPad &&
-            y <= pathStripY + renderedPathHeight + pathPad;
-        const isInClearing = (x, y) => {
-            const dx = x - clearingCenterX;
-            const dy = y - clearingCenterY;
-            const r = clearingRadius + clearingNoGrassPad;
-            return (dx * dx + dy * dy) <= (r * r);
-        };
-
-        const isNearChoice = (x, y) =>
-            Math.hypot(x - choice1.pos.x, y - choice1.pos.y) < minDistFromChoices ||
-            Math.hypot(x - choice2.pos.x, y - choice2.pos.y) < minDistFromChoices;
-
-        const spawnGrassAt = (x, y) => {
-            const sprite = grassAnimSprites[Math.floor(Math.random() * grassAnimSprites.length)];
-            const startFrame = Math.floor(Math.random() * 8);
-            const g = k.add([
-                k.sprite(sprite, { frame: startFrame }),
-                k.pos(x, y),
-                k.anchor("center"),
-                k.scale(2.25 + Math.random() * 0.7),
-                k.opacity(0.76 + Math.random() * 0.18),
-                k.z(35),
-            ]);
-            g.play("sway");
-        };
-
-        const trySpawn = () => {
-            for (let attempt = 0; attempt < maxAttempts; attempt++) {
-                const x = 14 + Math.random() * Math.max(4, w - 28);
-                const y = 14 + Math.random() * Math.max(4, h - 28);
-                if (isOnPath(x, y)) continue;
-                if (isInClearing(x, y)) continue;
-                if (isNearChoice(x, y)) continue;
-                spawnGrassAt(x, y);
-                return;
-            }
-        };
-
-        for (let i = 0; i < totalGrass; i++) {
-            trySpawn();
-        }
-    }
+    // Grass patch sprites removed per latest direction.
 
     // ---- M4: NPC placeholder — to the right of clearing center, speech bubble above ----
     const npcSize = 192;
@@ -686,7 +1098,6 @@ export default function gameScene(k) {
     // ---- Input: keyboard + touch-to-move (touch only, not mouse) ----
     const moveAmount = 200;
     let moveTarget = null;   // {x, y} or null — set by touch, cleared on arrival or keyboard
-    const isTouchDevice = ("ontouchstart" in globalThis) || (navigator.maxTouchPoints > 0);
 
     // Touch-to-move: only on mobile/touch devices so desktop mouse clicks don't interfere
     if (isTouchDevice) {
@@ -723,9 +1134,11 @@ export default function gameScene(k) {
     const roseCollisionOffsetY = playerBodyOffsetY - 20;
     const roseCollisionBodyW = playerBodyW;
     const roseCollisionBodyH = playerBodyH;
+    const roses = [choice1, choice2];
     const arrivalThreshold = 8;  // stop moving when this close to target
     let moveBlockTimer = 0;
     k.onUpdate(() => {
+        const dt = k.dt();
         const startX = player.pos.x;
         const startY = player.pos.y;
         let collidedThisFrame = false;
@@ -763,7 +1176,6 @@ export default function gameScene(k) {
 
         // Push player out of rose circles (solid borders)
         // Use rose circle radius against the player's body box for tighter borders.
-        const roses = [choice1, choice2];
         const roseCollisionRadius = choiceRadius - 1;
         for (const rose of roses) {
             const pLeft = player.pos.x + roseCollisionOffsetX - roseCollisionBodyW / 2;
@@ -820,13 +1232,31 @@ export default function gameScene(k) {
             }
         }
 
+        // Push player out of tree trunk colliders (bottom 20px of each 32px-wide tree base, scaled).
+        for (const trunk of treeTrunkColliders) {
+            const tpLeft = player.pos.x + playerBodyOffsetX - playerBodyW / 2;
+            const tpTop = player.pos.y + playerBodyOffsetY - playerBodyH / 2;
+            const tpRight = tpLeft + playerBodyW;
+            const tpBottom = tpTop + playerBodyH;
+            const treeOverlapX = Math.min(tpRight, trunk.right) - Math.max(tpLeft, trunk.left);
+            const treeOverlapY = Math.min(tpBottom, trunk.bottom) - Math.max(tpTop, trunk.top);
+            if (treeOverlapX > 0 && treeOverlapY > 0) {
+                collidedThisFrame = true;
+                if (treeOverlapX < treeOverlapY) {
+                    player.pos.x += (tpLeft < trunk.left) ? -treeOverlapX : treeOverlapX;
+                } else {
+                    player.pos.y += (tpTop < trunk.top) ? -treeOverlapY : treeOverlapY;
+                }
+            }
+        }
+
         const movedDist = Math.hypot(player.pos.x - startX, player.pos.y - startY);
         const movedThisFrame = movedDist > 0.05;
         if (moveTarget) {
             if (movedThisFrame) {
                 moveBlockTimer = 0;
             } else {
-                moveBlockTimer += k.dt();
+                moveBlockTimer += dt;
             }
             if (collidedThisFrame || moveBlockTimer > 0.12) {
                 moveTarget = null;
@@ -923,6 +1353,9 @@ export default function gameScene(k) {
         clearingCenter: { x: clearingCenterX, y: clearingCenterY },
         worldW: w,
         worldH: h,
+        ambientConfig: lowPerfMode
+            ? { maxPetals: 24, spawnInterval: 0.26, initialFillRatio: 0.55 }
+            : { maxPetals: 34, spawnInterval: 0.2, initialFillRatio: 0.65 },
         successBus: choiceSuccessBus,
     });
 

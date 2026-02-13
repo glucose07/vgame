@@ -1,27 +1,26 @@
-# Folder structure
+# Valentine Game
 
-- `src` - source code for your kaplay project
-- `dist` - distribution folder, contains your index.html, built js bundle and static assets
+A small Kaplay-based Valentine scene where a girl walks the path, interacts with flowers, and talks with an npc in the clearing.
 
+## How To Play
 
-## Development
+- Desktop: move with `WASD` or arrow keys, press `E` near the highlighted flower.
+- Mobile: tap to move, then tap the highlighted flower indicator to interact.
+- Goal: choose a flower and trigger the dialogue sequence.
 
-```sh
-$ npm run dev
-```
-
-will start a dev server at http://localhost:8000
-
-## Distribution
+## Run Locally
 
 ```sh
-$ npm run build
+npm install
+npm run dev
 ```
 
-will build your js files into `dist/`
+Dev server: `http://localhost:8000`
+
+## Build
 
 ```sh
-$ npm run zip
+npm run build
 ```
 
-will build your game and package into a .zip file, you can upload to your server or itch.io / newground etc.
+Build output is written to `dist/`.
